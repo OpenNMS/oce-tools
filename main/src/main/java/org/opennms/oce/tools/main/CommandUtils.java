@@ -29,28 +29,59 @@
 package org.opennms.oce.tools.main;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Objects;
 
 import org.opennms.oce.tools.cpn.ESBackedCpnDataset;
 import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.es.ESClient;
 
+import com.google.common.collect.Lists;
+
 public class CommandUtils {
 
+    private static final List<DateTimeFormatter> FORMATTERS = Lists.newArrayList(
+            DateTimeFormatter.ofPattern("MMM d yyyy HH:mm VV"),
+            DateTimeFormatter.ofPattern("MMM d yyyy HH:mm"),
+            DateTimeFormatter.ofPattern("MMM d yyyy")
+    );
+
     public static DateRange parseDateRange(String from, String to) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM d yyyy");
-        LocalDate localStart = LocalDate.parse(from, formatter);
-        ZonedDateTime zonedStartTime = localStart
-                .atStartOfDay()
-                .atZone(ZoneId.systemDefault());
-        LocalDate localEnd = LocalDate.parse(to, formatter);
-        ZonedDateTime zonedEndTime = localEnd
-                .atStartOfDay()
-                .atZone(ZoneId.systemDefault());
+        ZonedDateTime zonedStartTime = parseDate(from);
+        ZonedDateTime zonedEndTime = parseDate(to);
         return new DateRange(zonedStartTime, zonedEndTime);
+    }
+
+    private static ZonedDateTime parseDate(String dateStr) {
+        for (DateTimeFormatter formatter : FORMATTERS) {
+            try {
+                 return ZonedDateTime.parse(dateStr, formatter);
+            } catch (DateTimeParseException e) {
+                // pass
+            }
+
+            try {
+                LocalDateTime localDateTime = LocalDateTime.parse(dateStr, formatter);
+                return localDateTime.atZone(ZoneId.systemDefault());
+            } catch (DateTimeParseException e) {
+                // pass
+            }
+
+            try {
+                LocalDate localDate = LocalDate.parse(dateStr, formatter);
+                return localDate
+                        .atStartOfDay()
+                        .atZone(ZoneId.systemDefault());
+            } catch (DateTimeParseException e) {
+                // pass
+            }
+        }
+        throw new IllegalArgumentException("Unparsable date: " + dateStr);
     }
 
     public static ESBackedCpnDataset load(Context context, String from, String to) {
