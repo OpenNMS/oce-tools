@@ -1,13 +1,12 @@
 # OpenNMS Correlation Engine (OCE) Tools
 
-This repository contains a collection of tools and utilities to help
-develop, test, and validate the functionality of the OCE.
+This repository contains a collection of tools and utilities to help develop, test, and validate the functionality of the OCE.
 
 # Building
 
 ## Requirements
 
-Before building ensure you have built and install the artifacts from the OCE project.
+Before building ensure you have built and installed the artifacts from the OCE project.
 
 ## Compiling
 
@@ -30,7 +29,7 @@ echo 'clusters:
     conn-timeout: 30000' > ~/.oce/es-config.yaml
 ```
 
-You can run the tool and enumerate the avilable commands using:
+You can run the tool and enumerate the available commands using:
 ```
 java -jar main/target/oce-tools.jar --help
 ```
@@ -67,7 +66,7 @@ oce-tools cpn-oce-export --from "Nov 4 2018" --to "Nov 5 2018" --output /tmp
 #### Using the data for simulations
 
 Once the data has been exported, you can adapt the following commands to:
-1. SimuLate the situation generation from the same list of alarms
+1. Simulate the situation generation from the same list of alarms
 1. Compare the generated situations to the tickets and calculate a score
 
 ```
