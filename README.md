@@ -6,7 +6,9 @@ This repository contains a collection of tools and utilities to help develop, te
 
 ## Requirements
 
-Before building ensure you have built and installed the artifacts from the OCE project.
+Before building ensure you have built and installed (`mvn install`) the artifacts from:
+* The `master` branch of [OCE](https://github.com/OpenNMS/oce)
+* The `features/sextant` branch of [OpenNMS](https://github.com/OpenNMS/opennms/tree/features/sextant)
 
 ## Compiling
 

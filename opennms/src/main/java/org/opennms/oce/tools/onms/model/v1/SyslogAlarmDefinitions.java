@@ -37,9 +37,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+import org.opennms.oce.opennms.model.ManagedObjectType;
 import org.opennms.oce.tools.onms.model.api.AlarmDefinition;
 import org.opennms.oce.tools.onms.model.api.EventType;
-import org.opennms.oce.tools.onms.model.api.ManagedObjectType;
 import org.opennms.oce.tools.onms.model.fluent.AlarmDefBuilder;
 import org.opennms.oce.tools.onms.model.fluent.EventDefBuilder;
 

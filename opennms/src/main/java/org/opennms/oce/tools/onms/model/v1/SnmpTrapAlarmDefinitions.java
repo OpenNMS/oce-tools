@@ -30,9 +30,9 @@ package org.opennms.oce.tools.onms.model.v1;
 
 import java.util.List;
 
+import org.opennms.oce.opennms.model.ManagedObjectType;
 import org.opennms.oce.tools.onms.model.api.AlarmDefinition;
 import org.opennms.oce.tools.onms.model.api.EventType;
-import org.opennms.oce.tools.onms.model.api.ManagedObjectType;
 import org.opennms.oce.tools.onms.model.fluent.AlarmDefBuilder;
 import org.opennms.oce.tools.onms.model.fluent.EventDefBuilder;
 import org.opennms.oce.tools.onms.model.mock.MockInterface;

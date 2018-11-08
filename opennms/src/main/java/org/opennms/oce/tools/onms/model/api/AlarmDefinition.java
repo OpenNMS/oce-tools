@@ -30,6 +30,7 @@ package org.opennms.oce.tools.onms.model.api;
 
 import java.util.List;
 
+import org.opennms.oce.opennms.model.ManagedObjectType;
 import org.opennms.oce.tools.onms.model.matchers.EventMatcher;
 
 public interface AlarmDefinition extends EventMatcher {

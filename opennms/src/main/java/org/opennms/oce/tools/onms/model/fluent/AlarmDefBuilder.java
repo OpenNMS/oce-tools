@@ -33,10 +33,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.BiFunction;
 
+import org.opennms.oce.opennms.model.ManagedObjectType;
 import org.opennms.oce.tools.onms.model.api.AlarmDefinition;
 import org.opennms.oce.tools.onms.model.api.EventDefinition;
 import org.opennms.oce.tools.onms.model.api.EventPayloadVisitor;
-import org.opennms.oce.tools.onms.model.api.ManagedObjectType;
 import org.opennms.oce.tools.onms.model.api.TriggerClearPair;
 import org.opennms.oce.tools.onms.model.common.AbstractAlarmDefinition;
 import org.opennms.oce.tools.onms.model.mock.MockNetwork;
