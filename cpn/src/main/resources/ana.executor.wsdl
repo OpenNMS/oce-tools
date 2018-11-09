@@ -1,0 +1,71 @@
+<definitions xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" xmlns:wsp="http://www.w3.org/ns/ws-policy" xmlns:wsp1_2="http://schemas.xmlsoap.org/ws/2004/09/policy" xmlns:wsam="http://www.w3.org/2007/05/addressing/metadata" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:tns="http://com/cisco/nm/ana/ns" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://schemas.xmlsoap.org/wsdl/" targetNamespace="http://com/cisco/nm/ana/ns" name="CommandExecuterService">
+    <types>
+        <xsd:schema>
+            <xsd:import namespace="http://com/cisco/nm/ana/ns" schemaLocation="types.xsd"></xsd:import>
+        </xsd:schema>
+    </types>
+    <message name="asyncExecute">
+        <part name="parameters" element="tns:asyncExecute"></part>
+    </message>
+    <message name="asyncExecuteResponse">
+        <part name="parameters" element="tns:asyncExecuteResponse"></part>
+    </message>
+    <message name="unregister">
+        <part name="parameters" element="tns:unregister"></part>
+    </message>
+    <message name="unregisterResponse">
+        <part name="parameters" element="tns:unregisterResponse"></part>
+    </message>
+    <message name="execute">
+        <part name="parameters" element="tns:execute"></part>
+    </message>
+    <message name="executeResponse">
+        <part name="parameters" element="tns:executeResponse"></part>
+    </message>
+    <portType name="CommandExecuterInstrumentor">
+        <operation name="asyncExecute">
+            <input wsam:Action="http://com/cisco/nm/ana/ns/CommandExecuterInstrumentor/asyncExecuteRequest" message="tns:asyncExecute"></input><output wsam:Action="http://com/cisco/nm/ana/ns/CommandExecuterInstrumentor/asyncExecuteResponse" message="tns:asyncExecuteResponse"></output>
+        </operation>
+        <operation name="unregister">
+            <input wsam:Action="http://com/cisco/nm/ana/ns/CommandExecuterInstrumentor/unregisterRequest" message="tns:unregister"></input><output wsam:Action="http://com/cisco/nm/ana/ns/CommandExecuterInstrumentor/unregisterResponse" message="tns:unregisterResponse"></output>
+        </operation>
+        <operation name="execute">
+            <input wsam:Action="http://com/cisco/nm/ana/ns/CommandExecuterInstrumentor/executeRequest" message="tns:execute"></input><output wsam:Action="http://com/cisco/nm/ana/ns/CommandExecuterInstrumentor/executeResponse" message="tns:executeResponse"></output>
+        </operation>
+    </portType>
+    <binding name="CommandExecuterAPIBinding" type="tns:CommandExecuterInstrumentor">
+        <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"></soap:binding>
+        <operation name="asyncExecute">
+            <soap:operation soapAction=""></soap:operation>
+            <input>
+                <soap:body use="literal"></soap:body>
+            </input>
+            <output>
+                <soap:body use="literal"></soap:body>
+            </output>
+        </operation>
+        <operation name="unregister">
+            <soap:operation soapAction=""></soap:operation>
+            <input>
+                <soap:body use="literal"></soap:body>
+            </input>
+            <output>
+                <soap:body use="literal"></soap:body>
+            </output>
+        </operation>
+        <operation name="execute">
+            <soap:operation soapAction=""></soap:operation>
+            <input>
+                <soap:body use="literal"></soap:body>
+            </input>
+            <output>
+                <soap:body use="literal"></soap:body>
+            </output>
+        </operation>
+    </binding>
+    <service name="CommandExecuterService">
+        <port name="CommandExecuterAPI" binding="tns:CommandExecuterAPIBinding">
+            <soap:address location="https://ana-cluster.opennms.com:6081/ana/ws/executer"></soap:address>
+        </port>
+    </service>
+</definitions>

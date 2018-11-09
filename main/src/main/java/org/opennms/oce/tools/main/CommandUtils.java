@@ -57,7 +57,7 @@ public class CommandUtils {
         return new DateRange(zonedStartTime, zonedEndTime);
     }
 
-    private static ZonedDateTime parseDate(String dateStr) {
+    public static ZonedDateTime parseDate(String dateStr) {
         for (DateTimeFormatter formatter : FORMATTERS) {
             try {
                  return ZonedDateTime.parse(dateStr, formatter);

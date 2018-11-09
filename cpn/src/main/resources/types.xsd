@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!-- Published by JAX-WS RI at http://jax-ws.dev.java.net. RI's version is JAX-WS RI 2.2.4-b01. --><xs:schema xmlns:tns="http://com/cisco/nm/ana/ns" xmlns:ns1="http://www.w3.org/2005/08/addressing" xmlns:xs="http://www.w3.org/2001/XMLSchema" version="1.0" targetNamespace="http://com/cisco/nm/ana/ns">
+
+    <xs:import namespace="http://www.w3.org/2005/08/addressing" schemaLocation="http://www.w3.org/2006/03/addressing/ws-addr.xsd"></xs:import>
+
+    <xs:element name="asyncExecute" type="tns:asyncExecute"></xs:element>
+
+    <xs:element name="asyncExecuteResponse" type="tns:asyncExecuteResponse"></xs:element>
+
+    <xs:element name="execute" type="tns:execute"></xs:element>
+
+    <xs:element name="executeResponse" type="tns:executeResponse"></xs:element>
+
+    <xs:element name="unregister" type="tns:unregister"></xs:element>
+
+    <xs:element name="unregisterResponse" type="tns:unregisterResponse"></xs:element>
+
+    <xs:complexType name="execute">
+        <xs:sequence>
+            <xs:element name="arg0" type="xs:string" minOccurs="0"></xs:element>
+            <xs:element name="arg1" type="ns1:EndpointReferenceType" minOccurs="0"></xs:element>
+            <xs:element name="arg2" type="xs:string" minOccurs="0"></xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="executeResponse">
+        <xs:sequence>
+            <xs:element name="return" type="xs:string" minOccurs="0"></xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="asyncExecute">
+        <xs:sequence>
+            <xs:element name="arg0" type="xs:string" minOccurs="0"></xs:element>
+            <xs:element name="arg1" type="ns1:EndpointReferenceType" minOccurs="0"></xs:element>
+            <xs:element name="arg2" type="xs:string" minOccurs="0"></xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="asyncExecuteResponse">
+        <xs:sequence>
+            <xs:element name="return" type="xs:string" minOccurs="0"></xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="unregister">
+        <xs:sequence>
+            <xs:element name="arg0" type="xs:string" minOccurs="0"></xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="unregisterResponse">
+        <xs:sequence></xs:sequence>
+    </xs:complexType>
+</xs:schema>

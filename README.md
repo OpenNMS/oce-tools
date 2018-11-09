@@ -43,6 +43,25 @@ alias oce-tools="java -jar ~/git/oce-tools/main/target/oce-tools.jar"
 
 ## Commands
 
+### cpn-report
+
+This command can be used to find and automatically download .csv reports from CPN.
+It assumes that the `Detailed Traps`, `Detailed Service Events`, `Detailed Syslogs` and `Detailed Tickets` reports are scheduled to be executed on a daily basis at the same times.
+
+Example usage:
+```
+oce-tools cpn-report --url https://ana-cluster:6081/ana --username onms --password onms --output /tmp/cpn-exports/ --from "Nov 4 2018"
+```
+
+#### BQL
+
+This command can also be leverage to run arbitrary BQL command (synchronously) against CPN i.e.
+```
+echo '<?xml version="1.0" encoding="UTF-8"?>
+<command name="DeviceList"></command>' > /tmp/cpn.get.device.list.xml
+oce-tools cpn-report --url https://ana-cluster:6081/ana --username onms --password onms --execute /tmp/cpn.get.device.list.xml
+```
+
 ### cpn-csv-import
 
 This command imports a series of .csv files exported by CPN into Elasticsearch.

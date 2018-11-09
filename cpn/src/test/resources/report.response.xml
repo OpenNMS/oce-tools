@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CommandResult>
+    <IReportList type="IReportList" instance_id="0">
+        <ID type="Oid">{[ReportList(ListTargetOid={[ReportRoot][ReportCategory(Category=Events Reports)][ReportType(Type=Detailed Tickets)]})]}</ID>
+        <ReportList type="IMObjects_Array">
+            <IReport type="IReport" instance_id="1">
+                <ID type="Oid">{[ReportList(ListTargetOid={[ReportRoot][ReportCategory(Category=Events Reports)][ReportType(Type=Detailed Tickets)]})][Report(Id=7459)]}</ID>
+                <Description type="">Null</Description>
+                <Type type="String">Detailed Tickets</Type>
+                <DataOid type="">Null</DataOid>
+                <StateEnum type="Integer">1</StateEnum>
+                <Name type="String">Daily_Detailed_Tickets</Name>
+                <ReportSize type="Long">2272270</ReportSize>
+                <CreationTime type="java.util.Date">Mon Oct 22 11:10:00 CDT 2018</CreationTime>
+                <DataSourceEnum type="Integer">0</DataSourceEnum>
+                <StatusDescription type="">Null</StatusDescription>
+                <Username type="String">me</Username>
+                <Pub type="Boolean">true</Pub>
+                <RunningTime type="Long">18731</RunningTime>
+                <URI type="String">/reportfw/rptdocument/Daily_Detailed_Tickets-7459.rptdocument</URI>
+            </IReport>
+            <IReport type="IReport" instance_id="181">
+                <ID type="Oid">{[ReportList(ListTargetOid={[ReportRoot][ReportCategory(Category=Events Reports)][ReportType(Type=Detailed Tickets)]})][Report(Id=7221)]}</ID>
+                <Description type="">Null</Description>
+                <Type type="String">Detailed Tickets</Type>
+                <DataOid type="">Null</DataOid>
+                <StateEnum type="Integer">1</StateEnum>
+                <Name type="String">Daily_Detailed_Tickets</Name>
+                <ReportSize type="Long">1907854</ReportSize>
+                <CreationTime type="java.util.Date">Sat Oct 06 11:10:00 CDT 2018</CreationTime>
+                <DataSourceEnum type="Integer">0</DataSourceEnum>
+                <StatusDescription type="">Null</StatusDescription>
+                <Username type="String">me</Username>
+                <Pub type="Boolean">true</Pub>
+                <RunningTime type="Long">19495</RunningTime>
+                <URI type="String">/reportfw/rptdocument/Daily_Detailed_Tickets-7221.rptdocument</URI>
+            </IReport>
+        </ReportList>
+    </IReportList>
+</CommandResult>

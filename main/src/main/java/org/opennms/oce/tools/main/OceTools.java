@@ -59,7 +59,8 @@ public class OceTools {
             CpnOnmsEventHandlingAuditCommand.NAME,
             CpnOnmsEventMatAuditCommand.NAME,
             CpnOnmsSituationMatAuditCommand.NAME,
-            GenerateKemConfigCommand.NAME
+            GenerateKemConfigCommand.NAME,
+            CpnReportCommand.NAME
     );
 
     @Option(name = "--es-config", usage = "elasticsearch configuration", metaVar = "es-yaml-config")
@@ -76,7 +77,8 @@ public class OceTools {
             @SubCommand(name=CpnOnmsEventHandlingAuditCommand.NAME, impl=CpnOnmsEventHandlingAuditCommand.class),
             @SubCommand(name=CpnOnmsEventMatAuditCommand.NAME, impl=CpnOnmsEventMatAuditCommand.class),
             @SubCommand(name=CpnOnmsSituationMatAuditCommand.NAME, impl=CpnOnmsSituationMatAuditCommand.class),
-            @SubCommand(name=GenerateKemConfigCommand.NAME, impl=GenerateKemConfigCommand.class)
+            @SubCommand(name=GenerateKemConfigCommand.NAME, impl=GenerateKemConfigCommand.class),
+            @SubCommand(name=CpnReportCommand.NAME, impl=CpnReportCommand.class)
     })
     private Command cmd;
 
