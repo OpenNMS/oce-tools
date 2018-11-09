@@ -33,9 +33,9 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.opennms.features.es.alarms.dto.AlarmDocumentDTO;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.TrapRecord;
+import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
 

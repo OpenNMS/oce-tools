@@ -48,7 +48,7 @@ import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
-import org.opennms.features.es.alarms.dto.AlarmDocumentDTO;
+import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;

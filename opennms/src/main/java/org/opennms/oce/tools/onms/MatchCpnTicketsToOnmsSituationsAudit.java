@@ -44,11 +44,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.util.Strings;
-import org.opennms.features.es.alarms.dto.AlarmDocumentDTO;
 import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.TicketRecord;
 import org.opennms.oce.tools.cpn.model.TrapRecord;
+import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.match.CpnToOnmsEventMatcher;
 

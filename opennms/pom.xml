@@ -68,12 +68,15 @@
             <version>${opennms.version}</version>
             <scope>compile</scope>
         </dependency>
+	<!--
+	Disable this for now and embed the DTOs in this package
         <dependency>
             <groupId>org.opennms.features</groupId>
             <artifactId>org.opennms.features.alarms-in-es</artifactId>
             <version>${opennms.version}</version>
             <scope>compile</scope>
         </dependency>
+	-->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-slf4j-impl</artifactId>
