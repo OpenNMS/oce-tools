@@ -118,7 +118,10 @@ public class OceTools {
     private void printUsage(CmdLineParser parser) {
         System.out.println("cpn-tools <command>");
         parser.printUsage(System.out);
-        System.out.println("Available commands are: " + availableSubCommands.stream().collect(Collectors.joining(",")));
+        System.out.println("Available commands are: ");
+        for (String subCommand : availableSubCommands) {
+            System.out.printf("\t%s\n", subCommand);
+        }
     }
 
 }
