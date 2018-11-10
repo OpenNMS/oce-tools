@@ -68,4 +68,22 @@ public class CommandUtilsTest {
         assertThat(range.getStart(), equalTo(expectedStart));
         assertThat(range.getEnd(), equalTo(expectedEnd));
     }
+
+    @Test
+    public void canParseDate() {
+        ZonedDateTime expectedDate = LocalDate.of(2018, 6, 10)
+                .atStartOfDay()
+                .atZone(ZoneId.systemDefault());
+
+        // Full month name
+        assertThat(CommandUtils.parseDate("June 10 2018"), equalTo(expectedDate));
+
+        // 3 digit month name
+        assertThat(CommandUtils.parseDate("Jun 10 2018"), equalTo(expectedDate));
+
+        // numeric month
+        assertThat(CommandUtils.parseDate("06 10 2018"), equalTo(expectedDate));
+        assertThat(CommandUtils.parseDate("6 10 2018"), equalTo(expectedDate));
+    }
+
 }

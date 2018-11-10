@@ -48,7 +48,10 @@ public class CommandUtils {
     private static final List<DateTimeFormatter> FORMATTERS = Lists.newArrayList(
             DateTimeFormatter.ofPattern("MMM d yyyy HH:mm VV"),
             DateTimeFormatter.ofPattern("MMM d yyyy HH:mm"),
-            DateTimeFormatter.ofPattern("MMM d yyyy")
+            DateTimeFormatter.ofPattern("MMM d yyyy"),
+            DateTimeFormatter.ofPattern("MMMM d yyyy"),
+            DateTimeFormatter.ofPattern("MM d yyyy"),
+            DateTimeFormatter.ofPattern("M d yyyy")
     );
 
     public static DateRange parseDateRange(String from, String to) {
