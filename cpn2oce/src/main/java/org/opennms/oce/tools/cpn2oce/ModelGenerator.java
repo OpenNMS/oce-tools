@@ -35,7 +35,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.opennms.oce.datasource.v1.schema.Inventory;
 import org.opennms.oce.datasource.v1.schema.MetaModel;
@@ -46,7 +45,7 @@ import org.opennms.oce.datasource.v1.schema.PeerDefRef;
 import org.opennms.oce.datasource.v1.schema.PeerRef;
 import org.opennms.oce.datasource.v1.schema.RelativeDefRef;
 import org.opennms.oce.datasource.v1.schema.RelativeRef;
-import org.opennms.oce.tools.cpn.CpnDataset;
+import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn2oce.model.ModelObject;
 import org.opennms.oce.tools.cpn2oce.model.ModelObjectType;
 
@@ -55,22 +54,26 @@ public class ModelGenerator {
     public static final String MODEL_ROOT_ID = "model";
 
     private final EventMapper mapper;
-    private final CpnDataset dataset;
+    private final List<EventRecord> events;
 
     private MetaModel metaModel;
     private Inventory inventory;
 
-    public ModelGenerator(EventMapper mapper, CpnDataset dataset) {
+    public ModelGenerator(EventMapper mapper, List<EventRecord> events) {
         this.mapper = Objects.requireNonNull(mapper);
-        this.dataset = Objects.requireNonNull(dataset);
+        this.events = Objects.requireNonNull(events);
     }
 
     public void generate() {
         // Generate and flatten the tree of MOs
-        final Set<ModelObject> allMos = dataset.getEvents().stream()
-                .map(mapper::parse)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+        final Set<ModelObject> allMos = new LinkedHashSet<>();
+        for (EventRecord e : events) {
+            final ModelObject mo = mapper.parse(e);
+            if (mo != null) {
+                allMos.add(mo);
+            }
+        }
+
         final Set<ModelObject> relatedMos = new LinkedHashSet<>();
         for (ModelObject mo : allMos) {
             traverse(mo, relatedMos);

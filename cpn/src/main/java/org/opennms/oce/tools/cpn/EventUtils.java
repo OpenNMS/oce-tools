@@ -26,37 +26,18 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.oce.tools.cpn2oce.model;
+package org.opennms.oce.tools.cpn;
 
-import java.util.Arrays;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import org.opennms.oce.tools.cpn.model.EventRecord;
+import org.opennms.oce.tools.cpn.model.EventSeverity;
 
-public enum ModelObjectType {
-    DEVICE,
-    PORT(DEVICE),
-    CPU(DEVICE),
-    BGP_VRF(DEVICE),
-    BGP_PEER(BGP_VRF),
-    LINK,
-    OSPF_LINK,
-    MPLS,
-    LDP_NEIGHBOR(DEVICE),
-    POWER_SUPPLY(DEVICE),
-    FAN_TRAY(DEVICE),
-    FAN(FAN_TRAY,DEVICE),
-    AGGREGATION_GROUP(DEVICE),
-    CARD(DEVICE),
-    EIGRP_NEIGHBOR(PORT);
+public class EventUtils {
 
-    private final Set<ModelObjectType> parentTypes;
-
-    ModelObjectType(ModelObjectType... parentTypes) {
-        this.parentTypes = new LinkedHashSet<>(Arrays.asList(parentTypes));
+    public static boolean isClear(EventRecord e) {
+        if (e.getSeverity() != EventSeverity.Cleared) {
+            return false;
+        }
+        final String descr = e.getDetailedDescription();
+        return descr != null && descr.contains("Cleared due to ");
     }
-
-    public Set<ModelObjectType> getParentTypes() {
-        return parentTypes;
-    }
-
 }

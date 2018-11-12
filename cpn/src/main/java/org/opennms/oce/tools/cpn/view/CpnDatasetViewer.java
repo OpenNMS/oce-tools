@@ -26,37 +26,22 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.oce.tools.cpn2oce.model;
+package org.opennms.oce.tools.cpn.view;
 
-import java.util.Arrays;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.List;
+import java.util.function.Consumer;
 
-public enum ModelObjectType {
-    DEVICE,
-    PORT(DEVICE),
-    CPU(DEVICE),
-    BGP_VRF(DEVICE),
-    BGP_PEER(BGP_VRF),
-    LINK,
-    OSPF_LINK,
-    MPLS,
-    LDP_NEIGHBOR(DEVICE),
-    POWER_SUPPLY(DEVICE),
-    FAN_TRAY(DEVICE),
-    FAN(FAN_TRAY,DEVICE),
-    AGGREGATION_GROUP(DEVICE),
-    CARD(DEVICE),
-    EIGRP_NEIGHBOR(PORT);
+import org.opennms.oce.tools.cpn.model.EventRecord;
+import org.opennms.oce.tools.cpn.model.TicketRecord;
 
-    private final Set<ModelObjectType> parentTypes;
+public interface CpnDatasetViewer {
 
-    ModelObjectType(ModelObjectType... parentTypes) {
-        this.parentTypes = new LinkedHashSet<>(Arrays.asList(parentTypes));
-    }
+    TicketRecord getTicketWithId(String ticketId);
 
-    public Set<ModelObjectType> getParentTypes() {
-        return parentTypes;
-    }
+    void getTicketRecordsWithRootEventTimeInRange(Consumer<List<TicketRecord>> callback);
+
+    void getEventsInTicket(String ticketId, Consumer<List<EventRecord>> callback);
+
+    void getEventsInTicket(TicketRecord ticket, Consumer<List<EventRecord>> callback);
 
 }

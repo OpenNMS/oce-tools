@@ -29,13 +29,11 @@
 package org.opennms.oce.tools.cpn2oce;
 
 import java.io.File;
-import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.xml.bind.JAXBContext;
@@ -51,10 +49,11 @@ import org.opennms.oce.datasource.v1.schema.MetaModel;
 import org.opennms.oce.datasource.v1.schema.Severity;
 import org.opennms.oce.datasource.v1.schema.Situation;
 import org.opennms.oce.datasource.v1.schema.Situations;
-import org.opennms.oce.tools.cpn.CpnDataset;
+import org.opennms.oce.tools.cpn.EventUtils;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.EventSeverity;
 import org.opennms.oce.tools.cpn.model.TicketRecord;
+import org.opennms.oce.tools.cpn.view.CpnDatasetViewer;
 import org.opennms.oce.tools.cpn2oce.model.EventDefinition;
 import org.opennms.oce.tools.cpn2oce.model.ModelObject;
 import org.opennms.oce.tools.cpn2oce.model.ModelObjectKey;
@@ -68,29 +67,29 @@ public class OceGenerator  {
 
     private static final Logger LOG = LoggerFactory.getLogger(OceGenerator.class);
 
-    private final CpnDataset dataset;
-    private final boolean includeAllSituations;
-    private final boolean disableModel;
+    private final CpnDatasetViewer viewer;
+    private final boolean modelGenerationDisabled;
     private final File targetFolder;
+    private String ticketId;
+
+    private Situations situations;
+    private MetaModel metaModel;
+    private Inventory inventory;
+    private Alarms alarms;
 
     public static class Builder {
-        private CpnDataset dataset;
-        private boolean includeAllSituations = false;
-        private boolean disableModel = false;
+        private CpnDatasetViewer viewer;
+        private boolean modelGenerationDisabled = false;
         private File targetFolder;
+        private String ticketId;
 
-        public Builder withDataset(CpnDataset dataset) {
-            this.dataset = dataset;
+        public Builder withViewer(CpnDatasetViewer viewer) {
+            this.viewer = viewer;
             return this;
         }
 
-        public Builder withIncludeAllSituations(boolean includeAllSituations) {
-            this.includeAllSituations = includeAllSituations;
-            return this;
-        }
-
-        public Builder withDisableModel(boolean disableModel) {
-            this.disableModel = disableModel;
+        public Builder withModelGenerationDisabled(boolean modelGenerationDisabled) {
+            this.modelGenerationDisabled = modelGenerationDisabled;
             return this;
         }
 
@@ -99,27 +98,85 @@ public class OceGenerator  {
             return this;
         }
 
+        public Builder withTicketId(String ticketId) {
+            this.ticketId = ticketId;
+            return this;
+        }
+
         public OceGenerator build() {
-            Objects.requireNonNull(dataset, "dataset is required");
-            Objects.requireNonNull(targetFolder, "target folder is required");
+            Objects.requireNonNull(viewer, "viewer is required");
             return new OceGenerator(this);
         }
     }
 
     private OceGenerator(Builder builder) {
-        this.dataset = builder.dataset;
-        this.includeAllSituations = builder.includeAllSituations;
-        this.disableModel = builder.disableModel;
+        this.viewer = builder.viewer;
+        this.modelGenerationDisabled = builder.modelGenerationDisabled;
         this.targetFolder = builder.targetFolder;
+        this.ticketId = builder.ticketId;
     }
 
     public void generate() {
-        final MetaModel metaModel;
-        final Inventory inventory;
-        if (!disableModel) {
+        LOG.info("Generating the situations..");
+        situations = new Situations();
+
+        final List<TicketRecord> filteredTickets = new LinkedList<>();
+        if (ticketId == null) {
+            viewer.getTicketRecordsWithRootEventTimeInRange(filteredTickets::addAll);
+        } else {
+            TicketRecord t = viewer.getTicketWithId(ticketId);
+            if (t == null) {
+                throw new IllegalStateException("No ticket found with id: " + ticketId);
+            }
+            filteredTickets.add(t);
+        }
+
+        final List<EventRecord> allEventsInTickets = new LinkedList<>();
+        for (TicketRecord t : filteredTickets) {
+            final Situation situation = new Situation();
+            situation.setId(t.getTicketId());
+            situation.setCreationTime(t.getCreationTime().getTime());
+            situation.setSeverity(toSeverity(t.getSeverity()));
+            situation.setSummary(t.getDescription());
+            situation.setDescription(t.getDescription());
+
+            final List<EventRecord> eventsInTicket = new LinkedList<>();
+            viewer.getEventsInTicket(t, events -> {
+                for (EventRecord e : events) {
+                    if (Strings.isBlank(e.getAlarmId())) {
+                        // No alarm id!
+                        LOG.warn("Got event in ticket without an alarm id: {}", e);
+                        continue;
+                    }
+                    if (EventUtils.isClear(e)) {
+                        // Ignore clears
+                        continue;
+                    }
+                    final EventDefinition matchingDef = getMachingEvenfDef(e);
+                    if (matchingDef == null) {
+                        LOG.warn("No matching event definition for: {}. Skipping.", e);
+                        continue;
+                    }
+                    if (matchingDef.isIgnored()) {
+                        // Ignore
+                        continue;
+                    }
+                    eventsInTicket.add(e);
+                }
+            });
+            if (eventsInTicket.size() < 1) {
+                LOG.info("No events for ticket: {}. Ignoring.", t);
+                continue;
+            }
+            allEventsInTickets.addAll(eventsInTicket);
+            situation.getAlarmRef().addAll(getCausalityTree(t, eventsInTicket));
+            situations.getSituation().add(situation);
+        }
+
+        if (!modelGenerationDisabled) {
             LOG.info("Generating inventory and meta-model...");
             final EventMapper mapper = new EventMapper();
-            final ModelGenerator generator = new ModelGenerator(mapper, dataset);
+            final ModelGenerator generator = new ModelGenerator(mapper, allEventsInTickets);
             generator.generate();
 
             metaModel = generator.getMetaModel();
@@ -129,29 +186,13 @@ public class OceGenerator  {
             inventory = null;
         }
 
-        final Set<String> ignoredAlarmIds = new HashSet<>();
-
         LOG.info("Generating the list of alarms...");
-        final Alarms alarms = new Alarms();
-        final Map<String, List<EventRecord>> eventsByAlarmId = dataset.getEvents().stream()
-                .sorted(Comparator.comparing(EventRecord::getTime))
-                .filter(e -> {
-                    if (Strings.isBlank(e.getAlarmId())) {
-                        // No alarm id!
-                        return false;
-                    }
+        alarms = new Alarms();
 
-                    final EventDefinition matchingDef = getMachingEvenfDef(e);
-                    if (matchingDef == null || matchingDef.isIgnored()) {
-                        // No matching event definition, or the events should be ignored skip for now
-                        ignoredAlarmIds.add(e.getAlarmId());
-                        return false;
-                    }
-
-                    return true;
-                })
+        // Index the events by alarm id
+        final Map<String, List<EventRecord>> eventsByAlarmId = allEventsInTickets.stream()
                 .collect(Collectors.groupingBy(EventRecord::getAlarmId));
-
+        // Process each alarm
         eventsByAlarmId.forEach((alarmId, events) -> {
             events.sort(Comparator.comparing(EventRecord::getTime));
 
@@ -183,34 +224,15 @@ public class OceGenerator  {
                         throw new IllegalStateException("Should not happen!");
                     }
                     final ModelObject modelObject = matchingDef.getModelObjectTree(e);
-                    final List<ModelObjectKey> modelObjectKeys = OceModelObjetKeyMapper.getRelatedObjectIds(modelObject);
-                    final ModelObjectKey firstKey = modelObjectKeys.get(0);
-                    alarm.setInventoryObjectType("node");
-                    alarm.setInventoryObjectId(firstKey.getTokens().get(0));
+                    alarm.setInventoryObjectType(modelObject.getType().toString());
+                    alarm.setInventoryObjectId(modelObject.getId());
                 }
             }
         });
+    }
 
-        LOG.info("Generating the situations..");
-        final Situations situations = new Situations();
-        dataset.getTickets().stream()
-                .sorted(Comparator.comparing(TicketRecord::getCreationTime))
-                .forEach(t -> {
-                    final Situation situation = new Situation();
-                    situation.setId(t.getTicketId());
-                    situation.setCreationTime(t.getCreationTime().getTime());
-                    situation.setSeverity(toSeverity(t.getSeverity()));
-                    situation.setSummary(t.getDescription());
-                    situation.setDescription(t.getDescription());
-                    situation.getAlarmRef().addAll(getCausalityTree(dataset, t, ignoredAlarmIds));
-                    situations.getSituation().add(situation);
-                });
-
-        if (!includeAllSituations) {
-            // Remove incidents with less than 2 alarms
-            situations.getSituation().removeIf(s -> s.getAlarmRef().size() < 2);
-        }
-
+    public void writeResultsToDisk() {
+        Objects.requireNonNull(targetFolder, "target folder must be set");
         LOG.info("Marshalling results to disk...");
         try {
             JAXBContext jaxbContext = JAXBContext.newInstance(MetaModel.class, Inventory.class, Alarms.class, Situations.class);
@@ -233,33 +255,32 @@ public class OceGenerator  {
         LOG.info("Done.");
     }
 
-    private static List<AlarmRef> getCausalityTree(CpnDataset dataset, TicketRecord ticket, Set<String> ignoredAlarmIds) {
-        final List<EventRecord> eventsInTicket = dataset.getEventsByTicketId(ticket.getTicketId());
+    public Situations getSituations() {
+        return situations;
+    }
+
+    public MetaModel getMetaModel() {
+        return metaModel;
+    }
+
+    public Inventory getInventory() {
+        return inventory;
+    }
+
+    public Alarms getAlarms() {
+        return alarms;
+    }
+
+    private static List<AlarmRef> getCausalityTree(TicketRecord ticket, List<EventRecord> eventsInTicket) {
         final Map<String, List<EventRecord>> eventsInTicketByAlarmId = eventsInTicket.stream()
                 .collect(Collectors.groupingBy(EventRecord::getAlarmId));
         return eventsInTicketByAlarmId.keySet().stream()
-                .filter(alarmId -> !ignoredAlarmIds.contains(alarmId))
                 .map(alarmId -> {
                     final AlarmRef cause = new AlarmRef();
                     cause.setId(alarmId);
                     return cause;
                 })
                 .collect(Collectors.toList());
-    }
-
-    private static List<AlarmRef> getCausalityTree(CpnDataset dataset, EventRecord event) {
-        final String causingEventId = event.getCausingEventId();
-        if (Strings.isBlank(causingEventId)) {
-            return Collections.emptyList();
-        }
-        final EventRecord causedBy = dataset.getEventById(causingEventId);
-        if (causedBy == null) {
-            return Collections.emptyList();
-        }
-        AlarmRef cause = new AlarmRef();
-        cause.setId(causedBy.getEventId());
-        cause.getAlarmRef().addAll(getCausalityTree(dataset, causedBy));
-        return Collections.singletonList(cause);
     }
 
     private static Severity toSeverity(EventSeverity severity) {

@@ -1,0 +1,58 @@
+[
+  {
+    "source": "service",
+    "severity": "Cleared",
+    "eventId": "20418274530567_1529635442440",
+    "time": "2018-06-21T22:44:02-0400",
+    "description": "Link up",
+    "detailedDescription": "Link Up",
+    "location": "dc1-sw01: GigabitEthernet2/0/27<->dc2-sw01: GigabitEthernet2/0/27",
+    "alarmId": "4015708",
+    "ticketId": "4015708",
+    "causingEventId": "",
+    "duplicationCount": 1,
+    "reductionCount": 1
+  },
+  {
+    "source": "service",
+    "severity": "Critical",
+    "eventId": "20139101656327_1529635192037",
+    "time": "2018-06-21T22:39:52-0400",
+    "description": "Link down due to oper down",
+    "detailedDescription": "Link Down due to Oper Status down",
+    "location": "dc1-sw01: GigabitEthernet2/0/27<->dc2-sw01: GigabitEthernet2/0/27",
+    "alarmId": "4015708",
+    "ticketId": "4015708",
+    "causingEventId": "",
+    "duplicationCount": 1,
+    "reductionCount": 1
+  },
+  {
+    "source": "service",
+    "severity": "Cleared",
+    "eventId": "17579301147911_1529634008479",
+    "time": "2018-06-21T22:20:08-0400",
+    "description": "Link up",
+    "detailedDescription": "Link Up",
+    "location": "dc1-sw01: GigabitEthernet2/0/27<->dc2-sw01: GigabitEthernet2/0/27",
+    "alarmId": "4015708",
+    "ticketId": "4015708",
+    "causingEventId": "",
+    "duplicationCount": 1,
+    "reductionCount": 1
+  },
+  {
+    "source": "service",
+    "severity": "Critical",
+    "eventId": "11617886541063_1529619092145",
+    "time": "2018-06-21T18:11:32-0400",
+    "description": "Link down due to oper down",
+    "detailedDescription": "Link Down due to Oper Status down",
+    "location": "dc1-sw01: GigabitEthernet2/0/27<->dc2-sw01: GigabitEthernet2/0/27",
+    "alarmId": "4015708",
+    "ticketId": "4015708",
+    "causingEventId": "",
+    "duplicationCount": 1,
+    "reductionCount": 1
+  }
+]

@@ -86,8 +86,10 @@ public class EventMapper {
                     .forDescr("Configuration error has occurred syslog")
                     .forDescr("Fex Port Status Noti Configure")
                     .forDescr("Link down due to admin down")
+                    .forDescr("Link down due to oper down")
                     .withType(ModelObjectType.PORT)
-                    .withMoBuilder(EventMapper::createPortObject)
+                    .withType(ModelObjectType.LINK)
+                    .withMoBuilder(EventMapper::createLinkOrPortObject)
                     .build(),
             // BGP related events
             EventDefinition.builder()
@@ -263,6 +265,13 @@ public class EventMapper {
                     .forDescr("All members operationally up")
                     .withType(ModelObjectType.AGGREGATION_GROUP)
                     .withMoBuilder(EventMapper::createAggregationGroupObject)
+                    .build(),
+            // EIGRP related events
+            EventDefinition.builder()
+                    .forDescr("DUAL 5 neighbor up syslog")
+                    .forDescr("DUAL 5 neighbor down syslog")
+                    .withType(ModelObjectType.EIGRP_NEIGHBOR)
+                    .withMoBuilder(EventMapper::createEigrpNeighbor)
                     .build()
     );
 
@@ -352,6 +361,22 @@ public class EventMapper {
         } catch (IllegalArgumentException ex) {
             return createPortObject(e);
         }
+    }
+
+    public static ModelObject createEigrpNeighbor(EventRecordLite e) {
+        final String location = e.getLocation();
+        Pattern p = Pattern.compile("^(.*): (.*): (.*)$");
+        Matcher m = p.matcher(location);
+        if (m.matches()) {
+            String device = m.group(1);
+            String port = m.group(2);
+            String neigh = m.group(3);
+            ModelObject parentNode = new ModelObject(device, device,  ModelObjectType.DEVICE);
+            ModelObject portNode = new ModelObject(String.format("%s: %s", device, port), port, ModelObjectType.PORT, parentNode);
+            ModelObject neighborNode = new ModelObject(location, neigh, ModelObjectType.EIGRP_NEIGHBOR, portNode);
+            return neighborNode;
+        }
+        throw new IllegalArgumentException("Could not parse: " + location);
     }
 
     public static ModelObject createPortObject(EventRecordLite e) {
@@ -508,7 +533,6 @@ public class EventMapper {
             List<ModelObject> peers = Lists.newArrayList(portANode, portBNode);
             return new ModelObject(location, location, ModelObjectType.LINK, peers);
         }
-
         throw new IllegalArgumentException("Failed to parse: " + location);
     }
 

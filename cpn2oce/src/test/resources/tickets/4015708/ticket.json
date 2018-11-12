@@ -1,0 +1,17 @@
+[
+  {
+    "severity": "Cleared",
+    "ticketId": "4015708",
+    "lastModificationTime": "2018-06-21T23:44:03-0400",
+    "rootEventTime": "2018-06-21T18:11:32-0400",
+    "description": "Link up",
+    "location": "dc1-sw01: GigabitEthernet2/0/27<->dc2-sw01: GigabitEthernet2/0/27",
+    "acknowledged": true,
+    "creationTime": "2018-06-21T18:11:32-0400",
+    "eventCount": 38,
+    "affectedDevicesCount": "2",
+    "duplicationCount": "4",
+    "reductionCount": "38",
+    "alarmCount": "9"
+  }
+]

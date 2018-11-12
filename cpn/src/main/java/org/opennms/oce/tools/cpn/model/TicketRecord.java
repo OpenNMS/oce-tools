@@ -156,4 +156,23 @@ public class TicketRecord {
     public int hashCode() {
         return Objects.hash(severity, ticketId, lastModificationTime, rootEventTime, description, location, acknowledged, creationTime, eventCount, affectedDevicesCount, duplicationCount, reductionCount, alarmCount);
     }
+
+    @Override
+    public String toString() {
+        return "TicketRecord{" +
+                "severity=" + severity +
+                ", ticketId='" + ticketId + '\'' +
+                ", lastModificationTime=" + lastModificationTime +
+                ", rootEventTime=" + rootEventTime +
+                ", description='" + description + '\'' +
+                ", location='" + location + '\'' +
+                ", acknowledged=" + acknowledged +
+                ", creationTime=" + creationTime +
+                ", eventCount=" + eventCount +
+                ", affectedDevicesCount='" + affectedDevicesCount + '\'' +
+                ", duplicationCount='" + duplicationCount + '\'' +
+                ", reductionCount='" + reductionCount + '\'' +
+                ", alarmCount='" + alarmCount + '\'' +
+                '}';
+    }
 }

@@ -32,10 +32,13 @@ import java.io.File;
 import java.io.IOException;
 
 import org.kohsuke.args4j.Option;
-import org.opennms.oce.tools.cpn.CpnDataset;
+import org.opennms.oce.tools.cpn.view.CpnDatasetView;
+import org.opennms.oce.tools.cpn.view.ESBackedCpnDatasetViewer;
 import org.opennms.oce.tools.cpn2oce.OceGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.Sets;
 
 public class CpnOceExportCommand extends AbstractCommand {
 
@@ -43,20 +46,26 @@ public class CpnOceExportCommand extends AbstractCommand {
 
     public static final String NAME = "cpn-oce-export";
 
-    @Option(name="--from",aliases = {"-f"}, usage="From date i.e. Oct 28 2018", required=true)
+    @Option(name="--from",aliases = {"-f"}, usage="From date i.e. Oct 28 2018")
     private String from;
 
-    @Option(name="--to",aliases = {"-t"}, usage="To date i.e. Oct 29 2018", required = true)
+    @Option(name="--to",aliases = {"-t"}, usage="To date i.e. Oct 29 2018")
     private String to;
+
+    @Option(name="--ticket-id", usage="Ticket ID")
+    private String ticketId;
 
     @Option(name="--output",aliases = {"-o"}, usage="Target folder", required = true)
     private File targetFolder;
 
-    @Option(name="--no-model",usage="Disable model generation")
-    private boolean disableModel = false;
+    @Option(name="--exclude-service-events",usage="Exclude service events and alarms from tickets")
+    private boolean excludeServiceEvents = false;
 
-    @Option(name="--include-all-situations",usage="Include all situations - even those with a single event/alarm")
-    private boolean includeAllSituations = false;
+    @Option(name="--no-model",usage="Disable model generation")
+    private boolean modelGenerationDisabled = false;
+
+    @Option(name="--include-ticket-with-one-alarm",usage="Include tickets with a single event/alarm")
+    private boolean includeTicketsWithASingleAlarm = false;
 
     public CpnOceExportCommand() {
         super(NAME);
@@ -64,8 +73,17 @@ public class CpnOceExportCommand extends AbstractCommand {
 
     @Override
     public void doExec(Context context) throws Exception {
-        // Load the data set
-        CpnDataset dataset = CommandUtils.load(context, from, to);
+        final CpnDatasetView.Builder viewBuilder = new CpnDatasetView.Builder();
+        if (from != null) {
+            viewBuilder.withStartTime(CommandUtils.parseDate(from));
+        }
+        if (to != null) {
+            viewBuilder.withEndTime(CommandUtils.parseDate(to));
+        }
+        viewBuilder.includeTicketsWithASingleAlarm(includeTicketsWithASingleAlarm);
+        if (excludeServiceEvents) {
+            viewBuilder.withEventTypes(Sets.newHashSet(CpnDatasetView.EventType.SYSLOG, CpnDatasetView.EventType.TRAP));
+        }
 
         // Ensure the target directory exists
         if (!targetFolder.isDirectory() && !targetFolder.mkdirs()) {
@@ -73,11 +91,12 @@ public class CpnOceExportCommand extends AbstractCommand {
         }
 
         final OceGenerator oceGenerator = new OceGenerator.Builder()
-                .withDataset(dataset)
+                .withViewer(new ESBackedCpnDatasetViewer(context.getEsClient(), viewBuilder.build()))
+                .withTicketId(ticketId)
                 .withTargetFolder(targetFolder)
-                .withDisableModel(disableModel)
-                .withIncludeAllSituations(includeAllSituations)
+                .withModelGenerationDisabled(modelGenerationDisabled)
                 .build();
         oceGenerator.generate();
+        oceGenerator.writeResultsToDisk();
     }
 }
