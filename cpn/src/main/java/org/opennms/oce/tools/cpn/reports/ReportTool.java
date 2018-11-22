@@ -344,7 +344,7 @@ public class ReportTool {
             }
 
             if (!foundCluster) {
-                LOG.warn("Failed to find cluster of reports with types: {} on: {}", reportTypes, day);
+                LOG.warn("Failed to find cluster of reports with types: {} on: {}. Available reports are: {}", reportTypes, day, reportsForDay);
             }
         }
 
