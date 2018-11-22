@@ -320,7 +320,8 @@ public class ReportTool {
         for (LocalDate day : reportsByDay.keySet()) {
             final List<Report> reportsForDay = reportsByDay.get(day)
                     .stream()
-                    .sorted(Comparator.comparing(Report::getCreationTime))
+                    // Sort the reports in descending order - so we find the last cluster
+                    .sorted(Comparator.comparing(Report::getCreationTime).reversed())
                     .collect(Collectors.toList());
 
             final Map<String, Report> filteredReportsByType = new HashMap<>();
