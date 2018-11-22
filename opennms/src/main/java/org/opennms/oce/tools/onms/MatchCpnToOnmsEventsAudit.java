@@ -38,6 +38,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.opennms.oce.tools.cpn.ESDataProvider;
+import org.opennms.oce.tools.cpn.EventUtils;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.TrapRecord;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
@@ -91,7 +92,7 @@ public class MatchCpnToOnmsEventsAudit {
     public void match() throws IOException {
         esDataProvider.getSyslogRecordsInRange(start, end, records -> {
             for (EventRecord r : records) {
-                if (r.getDetailedDescription().contains("Cleared due to ")) {
+                if (EventUtils.isClear(r)) {
                     System.out.println("Skipping clear.");
                     return;
                 }
@@ -115,6 +116,10 @@ public class MatchCpnToOnmsEventsAudit {
                 if (".1.3.6.1.6.3.1.1.5.5".equals(r.getTrapTypeOid())) {
                     System.out.println("Skipping authenticationFailure.");
                     continue;
+                }
+                if (EventUtils.isClear(r)) {
+                    System.out.println("Skipping clear.");
+                    return;
                 }
                 try {
                     Optional<ESEventDTO> event = cpnToOnmsEventMatcher.matchCpnTrapToOnmsTrap(r);

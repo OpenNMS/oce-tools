@@ -58,7 +58,8 @@ public class CpnToOnmsEventMatcher {
         }
         final String substringToMatch = m.group(1);
 
-        System.out.printf("Trying to match syslog at %s (%d) for: '%s' (hostname='%s') with substring: %s\n",
+        System.out.printf("Trying to match syslog (id=%s) at %s (%d) for: '%s' (hostname='%s') with substring: %s\n",
+                syslog.getEventId(),
                 syslog.getTime(), syslog.getTime().getTime(),
                 syslog.getLocation(),
                 hostname,
@@ -74,7 +75,8 @@ public class CpnToOnmsEventMatcher {
 
     public Optional<ESEventDTO> matchCpnTrapToOnmsTrap(TrapRecord trap) throws IOException {
         final String hostname = getHostnameFromLocation(trap.getLocation());
-        System.out.printf("Trying to match trap at %s (%d) for: '%s' (hostname='%s') with trap type OID: %s\n",
+        System.out.printf("Trying to match trap (id=%s) at %s (%d) for: '%s' (hostname='%s') with trap type OID: %s\n",
+                trap.getEventId(),
                 trap.getTime(), trap.getTime().getTime(),
                 trap.getLocation(),
                 hostname,
