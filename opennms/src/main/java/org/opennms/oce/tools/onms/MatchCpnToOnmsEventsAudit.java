@@ -47,7 +47,9 @@ import org.opennms.oce.tools.onms.match.CpnToOnmsEventMatcher;
 public class MatchCpnToOnmsEventsAudit {
 
     private final CpnToOnmsEventMatcher cpnToOnmsEventMatcher;
+    private final Map<String,Long> matchedMessagesByHost = new LinkedHashMap<>();
     private final Map<String,Long> unmatchedMessagesByHost = new LinkedHashMap<>();
+    private final Map<String,Long> matchedTrapsByType = new LinkedHashMap<>();
     private final Map<String,Long> unmatchedTrapsByType = new LinkedHashMap<>();
 
     private final ZonedDateTime start;
@@ -98,7 +100,9 @@ public class MatchCpnToOnmsEventsAudit {
                 }
                 try {
                     Optional<ESEventDTO> event = cpnToOnmsEventMatcher.matchCpnSyslogToOnmsSyslog(r);
-                    if (!event.isPresent()) {
+                    if (event.isPresent()) {
+                        logMatchForLocation(r.getLocation());
+                    } else {
                         logMismatchForLocation(r.getLocation());
                     }
                 } catch (IOException e) {
@@ -114,7 +118,7 @@ public class MatchCpnToOnmsEventsAudit {
                     continue;
                 }
                 if (".1.3.6.1.6.3.1.1.5.5".equals(r.getTrapTypeOid())) {
-                    System.out.println("Skipping authenticationFailure.");
+                    // Silently skip authenticationFailure traps - there are alot of these
                     continue;
                 }
                 if (EventUtils.isClear(r)) {
@@ -123,7 +127,10 @@ public class MatchCpnToOnmsEventsAudit {
                 }
                 try {
                     Optional<ESEventDTO> event = cpnToOnmsEventMatcher.matchCpnTrapToOnmsTrap(r);
-                    if (!event.isPresent()) {
+                    if (event.isPresent()) {
+                        logMatchForLocation(r.getLocation());
+                        logMatchForTrapType(r.getLocation());
+                    } else {
                         logMismatchForLocation(r.getLocation());
                         logMismatchForTrapType(r.getTrapTypeOid());
                     }
@@ -132,12 +139,29 @@ public class MatchCpnToOnmsEventsAudit {
                 }
             }
         });
+
+        System.out.println("\n\nResult summary:");
+        System.out.println("Matches by host:");
+        matchedMessagesByHost.forEach((k,v) -> System.out.printf("%s: %d\n", k, v));
+        System.out.println("Mismatches by host:");
         unmatchedMessagesByHost.forEach((k,v) -> System.out.printf("%s: %d\n", k, v));
+        System.out.println("Traps matched by type:");
+        matchedTrapsByType.forEach((k,v) -> System.out.printf("%s: %d\n", k, v));
+        System.out.println("Traps mismatched by type:");
         unmatchedTrapsByType.forEach((k,v) -> System.out.printf("%s: %d\n", k, v));
     }
 
+    private void logMatchForLocation(String location) {
+        matchedMessagesByHost.compute(EventUtils.getNodeLabelFromLocation(location), (k,v) -> {
+            if (v == null) {
+                return 1L;
+            } else {
+                return v+1;
+            }});
+    }
+
     private void logMismatchForLocation(String location) {
-        unmatchedMessagesByHost.compute(getNodeLabelFromLocation(location), (k,v) -> {
+        unmatchedMessagesByHost.compute(EventUtils.getNodeLabelFromLocation(location), (k,v) -> {
             if (v == null) {
                 return 1L;
             } else {
@@ -154,14 +178,12 @@ public class MatchCpnToOnmsEventsAudit {
             }});
     }
 
-    Pattern p = Pattern.compile("^(.*?)(([:#]).*)?$");
-    private String getNodeLabelFromLocation(String location) {
-        final Matcher m = p.matcher(location);
-        if (m.matches()) {
-            return m.group(1).toLowerCase();
-        } else {
-            throw new RuntimeException(location);
-        }
+    private void logMatchForTrapType(String trapTypeOid) {
+        matchedTrapsByType.compute(trapTypeOid, (k,v) -> {
+            if (v == null) {
+                return 1L;
+            } else {
+                return v+1;
+            }});
     }
-
 }

@@ -28,10 +28,14 @@
 
 package org.opennms.oce.tools.cpn;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.EventSeverity;
 
 public class EventUtils {
+    private static final Pattern NODE_LABEL_FROM_LOCATION_PATTERN = Pattern.compile("^(.*?)(([:#]).*)?$");
 
     public static boolean isClear(EventRecord e) {
         if (e.getSeverity() != EventSeverity.Cleared) {
@@ -39,5 +43,14 @@ public class EventUtils {
         }
         final String descr = e.getDetailedDescription();
         return descr != null && descr.contains("Cleared due to ");
+    }
+
+    public static String getNodeLabelFromLocation(String location) {
+        final Matcher m = NODE_LABEL_FROM_LOCATION_PATTERN.matcher(location);
+        if (m.matches()) {
+            return m.group(1).toLowerCase();
+        } else {
+            throw new RuntimeException(location);
+        }
     }
 }
