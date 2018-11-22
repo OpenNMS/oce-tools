@@ -129,7 +129,7 @@ public class MatchCpnToOnmsEventsAudit {
                     Optional<ESEventDTO> event = cpnToOnmsEventMatcher.matchCpnTrapToOnmsTrap(r);
                     if (event.isPresent()) {
                         logMatchForLocation(r.getLocation());
-                        logMatchForTrapType(r.getLocation());
+                        logMatchForTrapType(r.getTrapTypeOid());
                     } else {
                         logMismatchForLocation(r.getLocation());
                         logMismatchForTrapType(r.getTrapTypeOid());
@@ -141,13 +141,13 @@ public class MatchCpnToOnmsEventsAudit {
         });
 
         System.out.println("\n\nResult summary:");
-        System.out.println("Matches by host:");
+        System.out.println("\nMatches by host:");
         matchedMessagesByHost.forEach((k,v) -> System.out.printf("%s: %d\n", k, v));
-        System.out.println("Mismatches by host:");
+        System.out.println("\nMismatches by host:");
         unmatchedMessagesByHost.forEach((k,v) -> System.out.printf("%s: %d\n", k, v));
-        System.out.println("Traps matched by type:");
+        System.out.println("\nTraps matched by type:");
         matchedTrapsByType.forEach((k,v) -> System.out.printf("%s: %d\n", k, v));
-        System.out.println("Traps mismatched by type:");
+        System.out.println("\nTraps mismatched by type:");
         unmatchedTrapsByType.forEach((k,v) -> System.out.printf("%s: %d\n", k, v));
     }
 
