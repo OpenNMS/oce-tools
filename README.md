@@ -9,6 +9,7 @@ This repository contains a collection of tools and utilities to help develop, te
 Before building ensure you have built and installed (`mvn install`) the artifacts from:
 * The `master` branch of [OCE](https://github.com/OpenNMS/oce)
 * The `features/sextant` branch of [OpenNMS](https://github.com/OpenNMS/opennms/tree/features/sextant)
+* The `features/events/syslog` project in [OpenNMS](https://github.com/OpenNMS/opennms)
 
 ## Compiling
 
@@ -152,4 +153,13 @@ Generate the configuration for the KEM tool based on the known traps and syslog 
 Example usage:
 ```
 oce-tools generate-kem-config
+```
+
+### cpn-opennms-syslog-audit
+
+Reports syslog messages that were not parsed correctly.
+
+Example usage:
+```
+oce-tools cpn-opennms-syslog-audit --from "Oct 1 2018" --to "Nov 1 2018"
 ```

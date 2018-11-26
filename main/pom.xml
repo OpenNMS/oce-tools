@@ -116,6 +116,16 @@
             <groupId>args4j</groupId>
             <artifactId>args4j</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.opennms.features.events</groupId>
+            <artifactId>org.opennms.features.events.syslog</artifactId>
+            <version>${opennms.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.opennms.oce.integrations.opennms</groupId>
+            <artifactId>config</artifactId>
+            <version>${oce.version}</version>
+        </dependency>
 
         <!-- Test -->
         <dependency>
