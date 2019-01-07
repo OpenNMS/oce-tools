@@ -163,3 +163,13 @@ Example usage:
 ```
 oce-tools cpn-opennms-syslog-audit --from "Oct 1 2018" --to "Nov 1 2018"
 ```
+
+
+### tsaudit
+
+Ticket-situation audit
+
+Example usage:
+```
+oce-tools tsaudit --from "Jan 6 2019 18:00" --to "Jan 7 2019"
+```
