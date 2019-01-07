@@ -50,5 +50,7 @@ public class ESConfigurationDaoTest {
         assertThat(clusterConfig.getUrl(), equalTo("http://localhost:9200"));
         assertThat(clusterConfig.getReadTimeout(), equalTo(120000));
         assertThat(clusterConfig.getConnTimeout(), equalTo(30000));
+
+        assertThat(clusterConfig.getOpennmsEventIndex(), equalTo("opennms-events-raw-*"));
     }
 }

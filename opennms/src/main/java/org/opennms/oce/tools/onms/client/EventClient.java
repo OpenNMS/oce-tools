@@ -30,6 +30,7 @@ package org.opennms.oce.tools.onms.client;
 
 import static org.elasticsearch.index.query.QueryBuilders.matchQuery;
 import static org.elasticsearch.index.query.QueryBuilders.nestedQuery;
+import static org.elasticsearch.index.query.QueryBuilders.prefixQuery;
 import static org.elasticsearch.index.query.QueryBuilders.rangeQuery;
 
 import java.io.IOException;
@@ -48,6 +49,7 @@ import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.opennms.oce.tools.es.ESClusterConfiguration;
 import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 
 import com.google.gson.Gson;
@@ -64,9 +66,11 @@ import io.searchbox.params.Parameters;
 public class EventClient {
     public static final int BATCH_SIZE = 100;
 
+    private final ESClusterConfiguration esClusterConfiguration;
     private final JestClient client;
 
-    public EventClient(JestClient client) {
+    public EventClient(ESClusterConfiguration esClusterConfiguration, JestClient client) {
+        this.esClusterConfiguration = Objects.requireNonNull(esClusterConfiguration);
         this.client = Objects.requireNonNull(client);
     }
 
@@ -140,24 +144,18 @@ public class EventClient {
     public List<ESEventDTO> getTrapEvents(long startMs, long endMs, String hostname, String trapTypeOid) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.boolQuery()
+                .must(prefixQuery("nodelabel", hostname))
                 .must(nestedQuery("p_oids", QueryBuilders.termQuery("p_oids.value",trapTypeOid), ScoreMode.None))
                 .must(rangeQuery("@timestamp").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
         String query = searchSourceBuilder.toString();
         final Search search = new Search.Builder(query)
-                .addIndex("opennms-events-raw-*")
+                .addIndex(esClusterConfiguration.getOpennmsEventIndex())
                 .addSort(new Sort("@timestamp"))
                 .setParameter(Parameters.SCROLL, "5m")
                 .build();
 
         final List<ESEventDTO> matchedEvents = new ArrayList<>();
-        scroll(search, ESEventDTO.class, events -> {
-            for (ESEventDTO event : events) {
-                if (event.getNodeLabel() == null || !event.getNodeLabel().contains(hostname)) {
-                    continue;
-                }
-                matchedEvents.add(event);
-            }
-        });
+        scroll(search, ESEventDTO.class, matchedEvents::addAll);
         return matchedEvents;
     }
 
@@ -174,7 +172,7 @@ public class EventClient {
                 .format("epoch_millis");
         searchSourceBuilder.query(rangeQueryBuilder);
         final Search search = new Search.Builder(searchSourceBuilder.toString())
-                .addIndex("opennms-events-raw-*")
+                .addIndex(esClusterConfiguration.getOpennmsEventIndex())
                 .addSort(new Sort("@timestamp"))
                 .setParameter(Parameters.SCROLL, "5m")
                 .build();
