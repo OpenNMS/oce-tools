@@ -132,6 +132,11 @@
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.25.2</version>
         </dependency>
+        <dependency>
+            <groupId>org.opennms.features.events</groupId>
+            <artifactId>org.opennms.features.events.syslog</artifactId>
+            <version>${opennms.version}</version>
+        </dependency>
 
         <!-- Test -->
         <dependency>
