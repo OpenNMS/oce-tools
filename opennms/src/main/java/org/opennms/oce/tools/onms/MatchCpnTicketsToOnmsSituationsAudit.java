@@ -48,6 +48,7 @@ import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.TicketRecord;
 import org.opennms.oce.tools.cpn.model.TrapRecord;
+import org.opennms.oce.tools.es.ESClient;
 import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.match.CpnToOnmsEventMatcher;
@@ -103,7 +104,10 @@ public class MatchCpnTicketsToOnmsSituationsAudit {
         this.start = builder.start;
         this.end = builder.end;
         this.ticketId = builder.ticketId;
-        this.cpnToOnmsEventMatcher = new CpnToOnmsEventMatcher(esDataProvider.getEsClient().getJestClient());
+
+
+        final ESClient esClient = esDataProvider.getEsClient();
+        this.cpnToOnmsEventMatcher = new CpnToOnmsEventMatcher(esClient);
     }
 
     public void audit() throws IOException {

@@ -35,6 +35,7 @@ import java.util.regex.Pattern;
 
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.TrapRecord;
+import org.opennms.oce.tools.es.ESClient;
 import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
@@ -45,7 +46,7 @@ public class CpnToOnmsEventMatcher {
 
     private final EventClient eventClient;
 
-    public CpnToOnmsEventMatcher(JestClient client) {
+    public CpnToOnmsEventMatcher(ESClient client) {
         this.eventClient = new EventClient(client);
     }
 

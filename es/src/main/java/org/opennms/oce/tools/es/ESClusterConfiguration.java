@@ -43,6 +43,9 @@ public class ESClusterConfiguration {
     @JsonProperty("conn-timeout")
     private int connTimeout;
 
+    @JsonProperty("opennms-event-index")
+    private String opennmsEventIndex;
+
     public String getName() {
         return name;
     }
@@ -73,5 +76,13 @@ public class ESClusterConfiguration {
 
     public void setConnTimeout(int connTimeout) {
         this.connTimeout = connTimeout;
+    }
+
+    public String getOpennmsEventIndex() {
+        return opennmsEventIndex;
+    }
+
+    public void setOpennmsEventIndex(String opennmsEventIndex) {
+        this.opennmsEventIndex = opennmsEventIndex;
     }
 }
