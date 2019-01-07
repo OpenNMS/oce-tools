@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -13,7 +12,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.opennms.oce.tools.cpn.ESDataProvider;
-import org.opennms.oce.tools.cpn.EventUtils;
 import org.opennms.oce.tools.cpn.model.TicketRecord;
 import org.opennms.oce.tools.tsaudit.NodeAndFacts;
 
@@ -29,29 +27,40 @@ public class Buckets {
     private List<Match> partialMatches = new ArrayList<>();
     private List<Ticket> unmatchedTickets = new ArrayList<>();
 
-    private Map<String, NodeAndFacts> nodesByName;
+    private Map<String, Node> nodesByName;
     private final ESDataProvider esDataProvider;
 
     public Buckets(ESDataProvider esDataProvider) {
         this.esDataProvider = Objects.requireNonNull(esDataProvider);
     }
 
-
     public void run(List<NodeAndFacts> nodes, ZonedDateTime start, ZonedDateTime end) throws IOException {
-        /// Map NodeAndFacts to bucket nodes DTO
-        // Retireve Tickets and the rest of the CPN data
-        nodesByName = nodes.stream().collect(Collectors.toMap(NodeAndFacts::getCpnHostname, Function.identity()));
+        // Map NodeAndFacts to bucket nodes DTO
+        // Retrieve Tickets and the rest of the CPN data
+        nodesByName = nodes.stream().map(n -> new Node(n.getOpennmsNodeId(), n.getOpennmsNodeLabel(), n.getCpnHostname()))
+                                         .collect(Collectors.toMap(Node::getCpnHostname, Function.identity()));
 
         esDataProvider.getTicketRecordsInRange(start, end, tickets -> {
             for (TicketRecord ticket : tickets) {
                 addTicketToNode(ticket);
             }
         });
+
+        // Filter CPN data as required and retrieve corresponding ONMS data.
+        Collection<Node> filteredNodes = filter(nodesByName.values());
+        for (Node n : filteredNodes) {
+            n.setOnmsData(getOnmsData(n));
+        }
+        parseNodes(filteredNodes);
     }
 
-    private void addTicketToNode(TicketRecord ticket) {
-        // if (ticket.getLocation().startsWith(nodeLabel))
-        // hostnames.add(EventUtils.getNodeLabelFromLocation(location));
+    private void addTicketToNode(TicketRecord record) {
+        Node node = nodesByName.get(getSanitizedLocation(record.getLocation()));
+        if (node != null) {
+            node.addTicket(new Ticket(record));
+        } else {
+            System.out.println("Failed to find node for ticket: " + record);
+        }
     }
 
     private static String getSanitizedLocation(String location) {
@@ -61,17 +70,7 @@ public class Buckets {
         return location;
     }
 
-    public void callIt(CpnData cpnData) {
-        // Filter CPN data as required and retrieve corresponding ONMS data.
-        CpnData filteredCpnData = filter(cpnData);
-        OnmsData onmsData = getOnmsData(filteredCpnData.getNodes());
-        for (Node n : onmsData.getNodes()) {
-            n.setOnmsData(onmsData);
-        }
-        doIt(cpnData.getNodes());
-    }
-
-    public void doIt(Collection<Node> nodes) {
+    private void parseNodes(Collection<Node> nodes) {
         // TODO - sort chrono Tickets and Situations
         // TODO - only search a small sliding window of time
         // TODO - remove matched situations from SituationSet
@@ -120,12 +119,13 @@ public class Buckets {
         System.out.println("-----");
     }
 
-    private OnmsData getOnmsData(Set<Node> nodes) {
+    private OnmsData getOnmsData(Node node) {
         // FIXME Query ES and collect the appropriate data
+        // Situations and Syslogs and Traps for the node (and Date Range)
         return null;
     }
 
-    private CpnData filter(CpnData cpnData) {
+    private Collection<Node> filter(Collection<Node> nodes) {
         // FIXME - Do filtering
         // TODO - report out data that is filtered.
         /*
@@ -134,7 +134,7 @@ public class Buckets {
          * Filter tickets that contain a “bad” node Filter tickets with a single “alarm”
          * Filter tickets that affect many nodes (to be revisited) TODO: FIXME: smith
          */
-        return null;
+        return nodes;
     }
 
 }

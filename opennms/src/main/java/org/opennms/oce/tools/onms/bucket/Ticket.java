@@ -2,6 +2,8 @@ package org.opennms.oce.tools.onms.bucket;
 
 import java.util.Set;
 
+import org.opennms.oce.tools.cpn.model.TicketRecord;
+
 public class Ticket {
 
     private String id;
@@ -10,6 +12,10 @@ public class Ticket {
 
     public Ticket(String id) {
         this.id = id;
+    }
+
+    public Ticket(TicketRecord record) {
+        // TODO Auto-generated constructor stub
     }
 
     public boolean matches(Situation s) {

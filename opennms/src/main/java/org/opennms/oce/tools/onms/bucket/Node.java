@@ -7,14 +7,25 @@ public class Node {
 
     int onmsNodeId;
 
-    // hostname in location field
     String onmsNodeLabel;
+    // hostname in location field
+    String cpnHostname;
+
+    public Node(int id, String label, String cpnHostname) {
+        this.onmsNodeId = id;
+        this.onmsNodeLabel = label;
+        this.cpnHostname = cpnHostname;
+    }
 
     // CPN DATA
     private final Set<Ticket> tickets = new HashSet<>();
 
     // ONMS DATA
     private final Set<Situation> situations = new HashSet<>();
+
+    public String getCpnHostname() {
+        return cpnHostname;
+    }
 
     public int getOnmsNodeId() {
         return onmsNodeId;
@@ -54,12 +65,12 @@ public class Node {
         this.tickets.addAll(tickets);
     }
 
-    public void addSituation(Situation situations) {
-        this.situations.add(situations);
+    public void addSituation(Situation situation) {
+        situations.add(situation);
     }
 
-    public void addTicket(Ticket tickets) {
-        this.tickets.add(tickets);
+    public void addTicket(Ticket ticket) {
+        tickets.add(ticket);
     }
 
 }
