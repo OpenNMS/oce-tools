@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.cpn.EventUtils;
@@ -75,12 +76,21 @@ public class TSAudit {
     }
 
     public void run() throws IOException {
+        // Build the complete list of nodes that have either trap or syslog events in CPN
+        // in the given time range and and gather facts related to these
         final List<NodeAndFacts> nodesAndFacts = getNodesAndFacts();
         if (nodesAndFacts.isEmpty()) {
             System.out.println("No nodes found.");
             return;
         }
         printNodesAndFactsAsTable(nodesAndFacts);
+
+        // Determine the subset of nodes that should be processed
+        final List<NodeAndFacts> nodesToProcess = nodesAndFacts.stream()
+                .filter(NodeAndFacts::shouldProcess)
+                .collect(Collectors.toList());
+
+        // TODO: Do something with the nodesToProcess
     }
 
     private List<NodeAndFacts> getNodesAndFacts() throws IOException {
