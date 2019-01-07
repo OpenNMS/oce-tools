@@ -26,7 +26,7 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.oce.tools.onms;
+package org.opennms.oce.tools.tsaudit;
 
 import static org.junit.Assert.assertEquals;
 
@@ -35,25 +35,25 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 
 import org.junit.Test;
 import org.opennms.netmgt.syslogd.SyslogMessage;
-import org.opennms.oce.tools.tsaudit.SyslogParser;
 
 public class SyslogParserTest {
+    private static final String dateString = "Jul 17 04:36:01.993";
+    private static final String message = "%CDP-4-NATIVE_VLAN_MISMATCH: Native VLAN mismatch discovered on " +
+            "GigabitEthernet0/43 (503), " +
+            "with Switch GigabitEthernet1/0/24 (1).";
+    private static final String syslogMessageString = "<188>1421602: " + dateString + ": " + message;
+
     @Test
-    public void testParser() throws ExecutionException, InterruptedException, TimeoutException, ParseException {
-        String dateString = "Jul 17 04:36:01.993";
-        String message = "%CDP-4-NATIVE_VLAN_MISMATCH: Native VLAN mismatch discovered on GigabitEthernet0/43 (503), " +
-                "with Switch GigabitEthernet1/0/24 (1).";
-        String syslogMessage = "<188>1421602: " + dateString + ": " + message;
+    public void testParse() throws ExecutionException, InterruptedException, ParseException {
         // prepend the year since parser assumes current year
         Date expectedDate =
                 new SimpleDateFormat("yyyy MMM dd hh:mm:ss.SSS").parse(Calendar.getInstance().get(Calendar.YEAR) + " "
                         + dateString);
 
-        SyslogMessage msg = SyslogParser.parse(syslogMessage);
+        SyslogMessage msg = SyslogParser.parse(syslogMessageString);
         assertEquals(expectedDate, msg.getDate());
         assertEquals(message, msg.getMessage());
     }

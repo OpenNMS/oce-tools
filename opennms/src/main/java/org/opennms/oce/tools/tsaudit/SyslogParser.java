@@ -37,10 +37,10 @@ import org.opennms.netmgt.syslogd.ByteBufferParser;
 import org.opennms.netmgt.syslogd.RadixTreeSyslogParser;
 import org.opennms.netmgt.syslogd.SyslogMessage;
 
-public class SyslogParser {
+class SyslogParser {
     private static final ByteBufferParser<SyslogMessage> parser = RadixTreeSyslogParser.getRadixParser();
 
-    public static SyslogMessage parse(String syslogMessageString) throws InterruptedException, ExecutionException {
+    static SyslogMessage parse(String syslogMessageString) throws InterruptedException, ExecutionException {
         CompletableFuture<SyslogMessage> messageFuture = parser.parse(ByteBuffer.wrap(syslogMessageString.getBytes()));
         SyslogMessage syslogMessage = messageFuture.get();
 
