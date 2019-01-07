@@ -36,6 +36,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.concurrent.ExecutionException;
 
@@ -58,8 +59,10 @@ public class GenericSyslogMessageTest {
                         + dateString);
         GenericSyslogMessage messageFromOnms = GenericSyslogMessage.fromOnms(host, message, expectedDate);
         assertThat(messageFromCpn, is(equalTo(messageFromOnms)));
+        assertThat(messageFromCpn.anyMatch(Collections.singleton(messageFromOnms)), is(equalTo(true)));
 
         messageFromOnms = GenericSyslogMessage.fromOnms("different", message, expectedDate);
         assertThat(messageFromCpn, not(equalTo(messageFromOnms)));
+        assertThat(messageFromCpn.anyMatch(Collections.singleton(messageFromOnms)), is(equalTo(false)));
     }
 }

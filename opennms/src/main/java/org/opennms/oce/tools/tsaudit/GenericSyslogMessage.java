@@ -30,6 +30,7 @@ package org.opennms.oce.tools.tsaudit;
 
 import java.util.Date;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import org.opennms.netmgt.syslogd.SyslogMessage;
@@ -63,6 +64,10 @@ public class GenericSyslogMessage {
         return new GenericSyslogMessage(Objects.requireNonNull(host), Objects.requireNonNull(message),
                 Objects.requireNonNull(date));
     }
+    
+    public boolean anyMatch(Set<GenericSyslogMessage> syslogs) {
+        return syslogs.stream().anyMatch(syslog -> syslog.equals(this));
+    }
 
     @Override
     public boolean equals(Object o) {
@@ -77,5 +82,14 @@ public class GenericSyslogMessage {
     @Override
     public int hashCode() {
         return Objects.hash(host, message, date);
+    }
+
+    @Override
+    public String toString() {
+        return "GenericSyslogMessage{" +
+                "host='" + host + '\'' +
+                ", message='" + message + '\'' +
+                ", date=" + date +
+                '}';
     }
 }
