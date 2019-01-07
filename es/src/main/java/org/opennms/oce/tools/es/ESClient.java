@@ -64,10 +64,6 @@ public class ESClient {
         jestClient = factory.getObject();
     }
 
-    public JestClient getJestClient() {
-        return jestClient;
-    }
-
     public <T> void bulkIndex(List<T> records, String index, String type, Function<T,String> idProvider) throws IOException {
         LOG.debug("Inserting {} records into index '{}'.", records.size(), index);
         int numRecordsRemaining = records.size();
@@ -81,5 +77,13 @@ public class ESClient {
             jestClient.execute(builder.build());
         }
         LOG.debug("Done inserting into index '{}'.", index);
+    }
+
+    public JestClient getJestClient() {
+        return jestClient;
+    }
+
+    public ESClusterConfiguration getClusterConfiguration() {
+        return clusterConfiguration;
     }
 }

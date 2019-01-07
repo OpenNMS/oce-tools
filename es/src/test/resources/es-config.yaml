@@ -3,3 +3,4 @@ clusters:
     url: http://localhost:9200
     read-timeout: 120000
     conn-timeout: 30000
+    opennms-event-index: opennms-events-raw-*
