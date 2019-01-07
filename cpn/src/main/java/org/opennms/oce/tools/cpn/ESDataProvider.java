@@ -42,6 +42,8 @@ import java.util.stream.Collectors;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
+import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.TicketRecord;
@@ -55,6 +57,7 @@ import io.searchbox.core.Get;
 import io.searchbox.core.Search;
 import io.searchbox.core.SearchResult;
 import io.searchbox.core.SearchScroll;
+import io.searchbox.core.search.aggregation.TermsAggregation;
 import io.searchbox.core.search.sort.Sort;
 import io.searchbox.params.Parameters;
 
@@ -251,6 +254,67 @@ public class ESDataProvider {
         allEventsInTicket.addAll(getTrapsInTicket(ticketId));
         allEventsInTicket.addAll(getServiceEventsInTicket(ticketId));
         return allEventsInTicket;
+    }
+
+    public void getDistinctLocations(ZonedDateTime startTime, ZonedDateTime endTime, Consumer<List<String>> callback) throws IOException {
+        String query = "{\n" +
+                "\t\"size\": \"0\",\n" +
+                "\t\"query\": {\n" +
+                "\t\t\"bool\": {\n" +
+                "\t\t\t\"filter\": [{\n" +
+                "\t\t\t\t\t\"range\": {\n" +
+                "\t\t\t\t\t\t\"time\": {\n" +
+                "\t\t\t\t\t\t\t\"gte\": " + startTime.toEpochSecond() + ",\n" +
+                "\t\t\t\t\t\t\t\"format\": \"epoch_second\"\n" +
+                "\t\t\t\t\t\t}\n" +
+                "\t\t\t\t\t}\n" +
+                "\t\t\t\t},\n" +
+                "\t\t\t\t{\n" +
+                "\t\t\t\t\t\"range\": {\n" +
+                "\t\t\t\t\t\t\"time\": {\n" +
+                "\t\t\t\t\t\t\t\"lte\": " + endTime.toEpochSecond() + ",\n" +
+                "\t\t\t\t\t\t\t\"format\": \"epoch_second\"\n" +
+                "\t\t\t\t\t\t}\n" +
+                "\t\t\t\t\t}\n" +
+                "\t\t\t\t}\n" +
+                "\t\t\t]\n" +
+                "\t\t}\n" +
+                "\t},\n" +
+                "\t\"aggs\": {\n" +
+                "\t\t\"uniq_location\": {\n" +
+                "\t\t\t\"terms\": {\n" +
+                "\t\t\t\t\"field\": \"location.keyword\",\n" +
+                "\t\t\t\t\"size\": 100000\n" + // FIXME: What if there are more?
+                "\t\t\t}\n" +
+                "\t\t}\n" +
+                "\t}\n" +
+                "}";
+
+        // Search for syslogs
+        Search search = new Search.Builder(query)
+                .addIndex("syslogs")
+                .addType("syslog")
+                .build();
+        SearchResult result = esClient.getJestClient().execute(search);
+        if (!result.isSucceeded()) {
+            throw new RuntimeException(result.getErrorMessage());
+        }
+        TermsAggregation terms = result.getAggregations().getTermsAggregation("uniq_location");
+        List<String> locations = terms.getBuckets().stream().map(TermsAggregation.Entry::getKeyAsString).collect(Collectors.toList());
+        callback.accept(locations);
+
+        // Search for traps
+        search = new Search.Builder(query)
+                .addIndex("traps")
+                .addType("trap")
+                .build();
+        result = esClient.getJestClient().execute(search);
+        if (!result.isSucceeded()) {
+            throw new RuntimeException(result.getErrorMessage());
+        }
+        terms = result.getAggregations().getTermsAggregation("uniq_location");
+        locations = terms.getBuckets().stream().map(TermsAggregation.Entry::getKeyAsString).collect(Collectors.toList());
+        callback.accept(locations);
     }
 
     private <T> void scroll(Search search, Class<T> clazz, Consumer<List<T>> callback) throws IOException {

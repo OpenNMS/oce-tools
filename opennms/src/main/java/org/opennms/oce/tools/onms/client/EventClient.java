@@ -48,6 +48,7 @@ import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.sort.SortOrder;
 import org.opennms.oce.tools.es.ESClient;
 import org.opennms.oce.tools.es.ESClusterConfiguration;
 import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
@@ -191,13 +192,30 @@ public class EventClient {
         return matchedEvents;
     }
 
+    public Optional<ESEventDTO> findFirstEventForHostname(long startMs, long endMs, String hostname) throws IOException {
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.sort("@timestamp", SortOrder.ASC);
+        searchSourceBuilder.size(1); // limit to 1
+        searchSourceBuilder.query(QueryBuilders.boolQuery()
+                .must(prefixQuery("nodelabel", hostname))
+                .must(rangeQuery("@timestamp").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
+        final Search search = new Search.Builder(searchSourceBuilder.toString())
+                .addIndex(esClusterConfiguration.getOpennmsEventIndex())
+                .addSort(new Sort("@timestamp"))
+                .setParameter(Parameters.SCROLL, "5m")
+                .build();
+
+        final List<ESEventDTO> matchedEvents = new ArrayList<>();
+        scroll(search, ESEventDTO.class, matchedEvents::addAll);
+        return matchedEvents.stream().findFirst();
+    }
+
     private <T> void scroll(Search search, Class<T> clazz, Consumer<List<T>> callback) throws IOException {
         JestResult result = client.execute(search);
         while(true) {
             if (!result.isSucceeded()) {
                 throw new RuntimeException(result.getErrorMessage());
             }
-
 
             Gson gson = new GsonBuilder()
                     .registerTypeAdapter(Date.class, new DateTimeTypeConverter()).create();

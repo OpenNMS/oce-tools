@@ -28,12 +28,14 @@
 
 package org.opennms.oce.tools.main;
 
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
 import org.kohsuke.args4j.Option;
 import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.es.ESClient;
+import org.opennms.oce.tools.onms.client.EventClient;
 import org.opennms.oce.tools.tsaudit.TSAudit;
 
 public class TSAuditCommand extends AbstractCommand {
@@ -53,12 +55,14 @@ public class TSAuditCommand extends AbstractCommand {
     }
 
     @Override
-    public void doExec(Context context) {
+    public void doExec(Context context) throws IOException {
         ESClient esClient = context.getEsClient();
         ESDataProvider esDataProvider = new ESDataProvider(esClient);
 
+        EventClient eventClient = new EventClient(esClient);
+
         CommandUtils.DateRange range = CommandUtils.parseDateRange(from, to);
-        final TSAudit tsAudit = new TSAudit(esDataProvider, range.getStart(), range.getEnd(), nodes);
+        final TSAudit tsAudit = new TSAudit(esDataProvider, eventClient, range.getStart(), range.getEnd(), nodes);
         tsAudit.run();
     }
 }

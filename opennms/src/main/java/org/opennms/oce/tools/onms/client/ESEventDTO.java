@@ -37,6 +37,9 @@ public class ESEventDTO {
     @SerializedName("nodelabel")
     private String nodeLabel;
 
+    @SerializedName("nodeid")
+    private Integer nodeId;
+
     @SerializedName("p_syslogmessage")
     private String syslogMessage;
 
@@ -52,6 +55,14 @@ public class ESEventDTO {
 
     public void setNodeLabel(String nodeLabel) {
         this.nodeLabel = nodeLabel;
+    }
+
+    public Integer getNodeId() {
+        return nodeId;
+    }
+
+    public void setNodeId(Integer nodeId) {
+        this.nodeId = nodeId;
     }
 
     public String getSyslogMessage() {
@@ -82,6 +93,7 @@ public class ESEventDTO {
     public String toString() {
         return "ESEventDTO{" +
                 "nodeLabel='" + nodeLabel + '\'' +
+                ", nodeId='" + nodeId + '\'' +
                 ", syslogMessage='" + syslogMessage + '\'' +
                 ", timestamp=" + timestamp +
                 ", id=" + id +

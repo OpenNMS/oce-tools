@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.opennms.oce.tools.cpn.EventUtils;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.TrapRecord;
 import org.opennms.oce.tools.es.ESClient;
@@ -51,7 +52,7 @@ public class CpnToOnmsEventMatcher {
     }
 
     public Optional<ESEventDTO> matchCpnSyslogToOnmsSyslog(EventRecord syslog) throws IOException {
-        final String hostname = getHostnameFromLocation(syslog.getLocation());
+        final String hostname = EventUtils.getNodeLabelFromLocation(syslog.getLocation());
         final Pattern p = Pattern.compile(".*?%.*?\\s*:\\s*(.*)$");
         final Matcher m = p.matcher(syslog.getDetailedDescription());
         if (!m.matches()) {
@@ -75,7 +76,7 @@ public class CpnToOnmsEventMatcher {
     }
 
     public Optional<ESEventDTO> matchCpnTrapToOnmsTrap(TrapRecord trap) throws IOException {
-        final String hostname = getHostnameFromLocation(trap.getLocation());
+        final String hostname = EventUtils.getNodeLabelFromLocation(trap.getLocation());
         System.out.printf("Trying to match trap (id=%s) at %s (%d) for: '%s' (hostname='%s') with trap type OID: %s\n",
                 trap.getEventId(),
                 trap.getTime(), trap.getTime().getTime(),
@@ -113,15 +114,6 @@ public class CpnToOnmsEventMatcher {
             System.out.println("FAILED");
         }
         return situation;
-    }
-
-    public static String getHostnameFromLocation(String location) {
-        Pattern p = Pattern.compile("^(.*?)(:.*)?$");
-        Matcher m = p.matcher(location);
-        if (m.matches()) {
-            return m.group(1).toLowerCase();
-        }
-        throw new IllegalArgumentException("Failed to parse: " + location);
     }
 
 }
