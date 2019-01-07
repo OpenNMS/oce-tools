@@ -28,6 +28,10 @@
 
 package org.opennms.oce.tools.cpn;
 
+import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
+import static org.elasticsearch.index.query.QueryBuilders.matchPhraseQuery;
+import static org.elasticsearch.index.query.QueryBuilders.prefixQuery;
+import static org.elasticsearch.index.query.QueryBuilders.rangeQuery;
 import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 
 import java.io.IOException;
@@ -45,6 +49,7 @@ import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.sort.SortOrder;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.TicketRecord;
 import org.opennms.oce.tools.cpn.model.TrapRecord;
@@ -254,6 +259,31 @@ public class ESDataProvider {
         allEventsInTicket.addAll(getTrapsInTicket(ticketId));
         allEventsInTicket.addAll(getServiceEventsInTicket(ticketId));
         return allEventsInTicket;
+    }
+
+    public long getNumSyslogEvents(ZonedDateTime startTime, ZonedDateTime endTime, String hostname) throws IOException {
+        return getNumEventsForHostname(startTime, endTime, hostname, "syslogs", "syslog");
+    }
+
+    public long getNumTrapEvents(ZonedDateTime startTime, ZonedDateTime endTime, String hostname) throws IOException {
+        return getNumEventsForHostname(startTime, endTime, hostname, "traps", "trap");
+    }
+
+    public long getNumEventsForHostname(ZonedDateTime startTime, ZonedDateTime endTime, String hostname, String index, String type) throws IOException {
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.size(0); // we don't need the results, only the count
+        searchSourceBuilder.query(QueryBuilders.boolQuery()
+                .must(matchPhraseQuery("location", hostname))
+                .must(rangeQuery("time").gte(startTime.toEpochSecond()).lte(endTime.toEpochSecond()).includeLower(true).includeUpper(true).format("epoch_second")));
+        final Search search = new Search.Builder(searchSourceBuilder.toString())
+                .addIndex(index)
+                .addType(type)
+                .build();
+        SearchResult result = esClient.getJestClient().execute(search);
+        if (!result.isSucceeded()) {
+            throw new RuntimeException(result.getErrorMessage());
+        }
+        return result.getTotal();
     }
 
     public void getDistinctLocations(ZonedDateTime startTime, ZonedDateTime endTime, Consumer<List<String>> callback) throws IOException {

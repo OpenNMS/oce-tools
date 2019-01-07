@@ -30,6 +30,7 @@ package org.opennms.oce.tools.tsaudit;
 
 import java.io.IOException;
 import java.time.ZonedDateTime;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -54,6 +55,8 @@ public class TSAudit {
     private final EventClient eventClient;
     private final ZonedDateTime start;
     private final ZonedDateTime end;
+    private final long startMs;
+    private final long endMs;
     private final List<String> nodes;
     private final StateCache stateCache;
 
@@ -63,9 +66,12 @@ public class TSAudit {
 
         this.start = Objects.requireNonNull(start);
         this.end = Objects.requireNonNull(end);
+        this.startMs = start.toInstant().toEpochMilli();
+        this.endMs = end.toInstant().toEpochMilli();
+
         this.nodes = Objects.requireNonNull(nodes);
 
-        this.stateCache = new StateCache(start.toInstant().toEpochMilli(), end.toInstant().toEpochMilli());
+        this.stateCache = new StateCache(startMs, endMs);
     }
 
     public void run() throws IOException {
@@ -94,10 +100,29 @@ public class TSAudit {
             nodesAndFacts.add(new NodeAndFacts(hostname));
         }
 
-        // Now try and find *some* event for where the node label starts with the given hostname
         for (NodeAndFacts nodeAndFacts : nodesAndFacts) {
+            // Now try and find *some* event for where the node label starts with the given hostname
             findOpennmsNodeInfo(nodeAndFacts);
+
+            // Don't do any further processing if there is no node associated
+            if (!nodeAndFacts.hasOpennmsNode()) {
+                continue;
+            }
+
+            // Count the number of syslogs and traps received in CPN
+            nodeAndFacts.setNumCpnSyslogs(esDataProvider.getNumSyslogEvents(start, end, nodeAndFacts.getCpnHostname()));
+            nodeAndFacts.setNumCpnTraps(esDataProvider.getNumTrapEvents(start, end, nodeAndFacts.getCpnHostname()));
+
+            // Count the number of syslogs and traps received in OpenNMS
+            nodeAndFacts.setNumOpennmsSyslogs(eventClient.getNumSyslogEvents(startMs, endMs, nodeAndFacts.getOpennmsNodeId()));
+            nodeAndFacts.setNumOpennmsTraps(eventClient.getNumTrapEvents(startMs, endMs, nodeAndFacts.getOpennmsNodeId()));
         }
+
+        // Sort
+        nodesAndFacts.sort(Comparator.comparing(NodeAndFacts::shouldProcess)
+                .thenComparing(n -> n.getNumCpnSyslogs() != null ? n.getNumCpnSyslogs() : 0)
+                .thenComparing(n -> n.getNumCpnTraps() != null ? n.getNumCpnTraps() : 0)
+                .reversed());
 
         return nodesAndFacts;
     }
@@ -109,8 +134,7 @@ public class TSAudit {
             return;
         }
 
-        final Optional<ESEventDTO> firstEvent = eventClient.findFirstEventForHostname(start.toInstant().toEpochMilli(),
-                end.toInstant().toEpochMilli(),
+        final Optional<ESEventDTO> firstEvent = eventClient.findFirstEventForHostname(startMs, endMs,
                 nodeAndFacts.getCpnHostname());
         if (firstEvent.isPresent()) {
             final ESEventDTO event = firstEvent.get();
@@ -127,13 +151,21 @@ public class TSAudit {
     private static void printNodesAndFactsAsTable(List<NodeAndFacts> nodesAndFacts) {
         AsciiTable at = new AsciiTable();
         at.addRule();
-        at.addRow("CPN Hostname", "OpenNMS Node Label", "OpenNMS Node ID");
+        at.addRow("Index", "CPN Hostname", "OpenNMS Node Label", "OpenNMS Node ID", "OpenNMS Syslogs", "OpenNMS Traps", "CPN Syslogs", "CPN Traps", "Process?");
         at.addRule();
+        int k = 1;
         for (NodeAndFacts n : nodesAndFacts) {
-            at.addRow(n.getCpnHostname(),
+            at.addRow(k,
+                    n.getCpnHostname(),
                     naWhenNull(n.getOpennmsNodeLabel()),
-                    naWhenNull(n.getOpennmsNodeId()));
+                    naWhenNull(n.getOpennmsNodeId()),
+                    naWhenNull(n.getNumOpennmsSyslogs()),
+                    naWhenNull(n.getNumOpennmsTraps()),
+                    naWhenNull(n.getNumCpnSyslogs()),
+                    naWhenNull(n.getNumCpnTraps()),
+                    n.shouldProcess() ? "Yes" : "No");
             at.addRule();
+            k++;
         }
 
         CWC_LongestLine cwc = new CWC_LongestLine();

@@ -35,8 +35,10 @@ public class NodeAndFacts {
     private String opennmsNodeLabel;
     private Integer opennmsNodeId;
     private Boolean clockSkewDetected;
-    private Boolean didOpennmsReceiveSyslog;
-    private Boolean didOpennmsReceiveTrap;
+    private Long numOpennmsSyslogs;
+    private Long numOpennmsTraps;
+    private Long numCpnSyslogs;
+    private Long numCpnTraps;
 
     public NodeAndFacts(String cpnHostname) {
         this.cpnHostname = Objects.requireNonNull(cpnHostname);
@@ -62,6 +64,42 @@ public class NodeAndFacts {
         this.opennmsNodeId = opennmsNodeId;
     }
 
+    public boolean hasOpennmsNode() {
+        return opennmsNodeLabel != null && opennmsNodeId != null;
+    }
+
+    public Long getNumOpennmsSyslogs() {
+        return numOpennmsSyslogs;
+    }
+
+    public void setNumOpennmsSyslogs(Long numOpennmsSyslogs) {
+        this.numOpennmsSyslogs = numOpennmsSyslogs;
+    }
+
+    public Long getNumOpennmsTraps() {
+        return numOpennmsTraps;
+    }
+
+    public void setNumOpennmsTraps(Long numOpennmsTraps) {
+        this.numOpennmsTraps = numOpennmsTraps;
+    }
+
+    public Long getNumCpnSyslogs() {
+        return numCpnSyslogs;
+    }
+
+    public void setNumCpnSyslogs(Long numCpnSyslogs) {
+        this.numCpnSyslogs = numCpnSyslogs;
+    }
+
+    public Long getNumCpnTraps() {
+        return numCpnTraps;
+    }
+
+    public void setNumCpnTraps(Long numCpnTraps) {
+        this.numCpnTraps = numCpnTraps;
+    }
+
     public Boolean getClockSkewDetected() {
         return clockSkewDetected;
     }
@@ -70,49 +108,52 @@ public class NodeAndFacts {
         this.clockSkewDetected = clockSkewDetected;
     }
 
-    public Boolean getDidOpennmsReceiveSyslog() {
-        return didOpennmsReceiveSyslog;
-    }
-
-    public void setDidOpennmsReceiveSyslog(Boolean didOpennmsReceiveSyslog) {
-        this.didOpennmsReceiveSyslog = didOpennmsReceiveSyslog;
-    }
-
-    public Boolean getDidOpennmsReceiveTrap() {
-        return didOpennmsReceiveTrap;
-    }
-
-    public void setDidOpennmsReceiveTrap(Boolean didOpennmsReceiveTrap) {
-        this.didOpennmsReceiveTrap = didOpennmsReceiveTrap;
+    public boolean shouldProcess() {
+        if (!hasOpennmsNode()) {
+            return false;
+        }
+        // if CPN has some traps, then OpenNMS must have them too
+        if (getNumCpnTraps() != null && getNumOpennmsTraps() != null && getNumCpnTraps() > 0 && getNumOpennmsTraps() <= 0) {
+            return false;
+        }
+        // if CPN has some syslogs, then OpenNMS must have them too
+        if (getNumCpnSyslogs() != null && getNumOpennmsSyslogs() != null && getNumCpnSyslogs() > 0 && getNumOpennmsSyslogs() <= 0) {
+            return false;
+        }
+        return true;
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        NodeAndFacts nodeFacts = (NodeAndFacts) o;
-        return Objects.equals(cpnHostname, nodeFacts.cpnHostname) &&
-                Objects.equals(opennmsNodeLabel, nodeFacts.opennmsNodeLabel) &&
-                Objects.equals(opennmsNodeId, nodeFacts.opennmsNodeId) &&
-                Objects.equals(clockSkewDetected, nodeFacts.clockSkewDetected) &&
-                Objects.equals(didOpennmsReceiveSyslog, nodeFacts.didOpennmsReceiveSyslog) &&
-                Objects.equals(didOpennmsReceiveTrap, nodeFacts.didOpennmsReceiveTrap);
+        NodeAndFacts that = (NodeAndFacts) o;
+        return Objects.equals(cpnHostname, that.cpnHostname) &&
+                Objects.equals(opennmsNodeLabel, that.opennmsNodeLabel) &&
+                Objects.equals(opennmsNodeId, that.opennmsNodeId) &&
+                Objects.equals(clockSkewDetected, that.clockSkewDetected) &&
+                Objects.equals(numOpennmsSyslogs, that.numOpennmsSyslogs) &&
+                Objects.equals(numOpennmsTraps, that.numOpennmsTraps) &&
+                Objects.equals(numCpnSyslogs, that.numCpnSyslogs) &&
+                Objects.equals(numCpnTraps, that.numCpnTraps);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(cpnHostname, opennmsNodeLabel, opennmsNodeId, clockSkewDetected, didOpennmsReceiveSyslog, didOpennmsReceiveTrap);
+        return Objects.hash(cpnHostname, opennmsNodeLabel, opennmsNodeId, clockSkewDetected, numOpennmsSyslogs, numOpennmsTraps, numCpnSyslogs, numCpnTraps);
     }
 
     @Override
     public String toString() {
-        return "NodeFacts{" +
+        return "NodeAndFacts{" +
                 "cpnHostname='" + cpnHostname + '\'' +
                 ", opennmsNodeLabel='" + opennmsNodeLabel + '\'' +
                 ", opennmsNodeId=" + opennmsNodeId +
                 ", clockSkewDetected=" + clockSkewDetected +
-                ", didOpennmsReceiveSyslog=" + didOpennmsReceiveSyslog +
-                ", didOpennmsReceiveTrap=" + didOpennmsReceiveTrap +
+                ", numOpennmsSyslogs=" + numOpennmsSyslogs +
+                ", numOpennmsTraps=" + numOpennmsTraps +
+                ", numCpnSyslogs=" + numCpnSyslogs +
+                ", numCpnTraps=" + numCpnTraps +
                 '}';
     }
 }

@@ -32,6 +32,7 @@ import static org.elasticsearch.index.query.QueryBuilders.matchQuery;
 import static org.elasticsearch.index.query.QueryBuilders.nestedQuery;
 import static org.elasticsearch.index.query.QueryBuilders.prefixQuery;
 import static org.elasticsearch.index.query.QueryBuilders.rangeQuery;
+import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -146,7 +147,7 @@ public class EventClient {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.boolQuery()
                 .must(prefixQuery("nodelabel", hostname))
-                .must(nestedQuery("p_oids", QueryBuilders.termQuery("p_oids.value",trapTypeOid), ScoreMode.None))
+                .must(nestedQuery("p_oids", termQuery("p_oids.value",trapTypeOid), ScoreMode.None))
                 .must(rangeQuery("@timestamp").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
         String query = searchSourceBuilder.toString();
         final Search search = new Search.Builder(query)
@@ -163,7 +164,7 @@ public class EventClient {
     public List<ESEventDTO> getSyslogEvents(long startMs, long endMs, String hostname, String group) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         final BoolQueryBuilder boolQuery = new BoolQueryBuilder();
-        boolQuery.mustNot(matchQuery("eventsource", "syslogd"));
+        boolQuery.must(matchQuery("eventsource", "syslogd"));
         searchSourceBuilder.query(boolQuery);
         final RangeQueryBuilder rangeQueryBuilder = new RangeQueryBuilder("@timestamp")
                 .gte(startMs)
@@ -208,6 +209,34 @@ public class EventClient {
         final List<ESEventDTO> matchedEvents = new ArrayList<>();
         scroll(search, ESEventDTO.class, matchedEvents::addAll);
         return matchedEvents.stream().findFirst();
+    }
+
+    public long getNumSyslogEvents(long startMs, long endMs, int nodeId) throws IOException {
+        return getNumEventsForSource(startMs, endMs, nodeId, "syslogd");
+    }
+
+    public long getNumTrapEvents(long startMs, long endMs, int nodeId) throws IOException {
+        return getNumEventsForSource(startMs, endMs, nodeId, "trapd") + getNumEventsForSource(startMs, endMs, nodeId, "event-translator");
+    }
+
+    public long getNumEventsForSource(long startMs, long endMs, int nodeId, String eventSource) throws IOException {
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.sort("@timestamp", SortOrder.ASC);
+        searchSourceBuilder.size(0); // we don't need the results, only the count
+        searchSourceBuilder.query(QueryBuilders.boolQuery()
+                .must(termQuery("nodeid", nodeId))
+                .must(termQuery("eventsource", eventSource))
+                .must(rangeQuery("@timestamp").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
+        final Search search = new Search.Builder(searchSourceBuilder.toString())
+                .addIndex(esClusterConfiguration.getOpennmsEventIndex())
+                .addSort(new Sort("@timestamp"))
+                .build();
+
+        SearchResult result = client.execute(search);
+        if (!result.isSucceeded()) {
+            throw new RuntimeException(result.getErrorMessage());
+        }
+        return result.getTotal();
     }
 
     private <T> void scroll(Search search, Class<T> clazz, Consumer<List<T>> callback) throws IOException {
