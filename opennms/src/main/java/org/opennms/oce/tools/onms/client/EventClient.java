@@ -38,7 +38,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -49,6 +48,7 @@ import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.opennms.oce.tools.es.ESClient;
 import org.opennms.oce.tools.es.ESClusterConfiguration;
 import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 
@@ -69,9 +69,9 @@ public class EventClient {
     private final ESClusterConfiguration esClusterConfiguration;
     private final JestClient client;
 
-    public EventClient(ESClusterConfiguration esClusterConfiguration, JestClient client) {
-        this.esClusterConfiguration = Objects.requireNonNull(esClusterConfiguration);
-        this.client = Objects.requireNonNull(client);
+    public EventClient(ESClient client) {
+        this.esClusterConfiguration = client.getClusterConfiguration();
+        this.client = client.getJestClient();
     }
 
     public Optional<AlarmDocumentDTO> findAlarmForEventWithId(Integer id) {

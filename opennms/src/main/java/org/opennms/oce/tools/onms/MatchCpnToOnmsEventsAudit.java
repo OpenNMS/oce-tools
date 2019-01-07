@@ -88,7 +88,7 @@ public class MatchCpnToOnmsEventsAudit {
         this.esDataProvider = builder.esDataProvider;
         this.start = builder.start;
         this.end = builder.end;
-        this.cpnToOnmsEventMatcher = new CpnToOnmsEventMatcher(esDataProvider.getEsClient().getJestClient());
+        this.cpnToOnmsEventMatcher = new CpnToOnmsEventMatcher(esDataProvider.getEsClient());
     }
 
     public void match() throws IOException {
