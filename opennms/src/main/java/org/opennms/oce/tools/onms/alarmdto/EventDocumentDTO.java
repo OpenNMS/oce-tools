@@ -32,24 +32,24 @@ import com.google.gson.annotations.SerializedName;
 
 public class EventDocumentDTO {
 
-    @SerializedName("uei")
-    private String uei;
+    @SerializedName("description")
+    private String description;
 
     @SerializedName("id")
     private Integer id;
 
-    @SerializedName("log-message")
+    @SerializedName("log_message")
     private String logMessage;
 
-    @SerializedName("description")
-    private String description;
+    @SerializedName("uei")
+    private String uei;
 
-    public String getUei() {
-        return uei;
+    public String getDescription() {
+        return description;
     }
 
-    public void setUei(String uei) {
-        this.uei = uei;
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public Integer getId() {
@@ -68,21 +68,21 @@ public class EventDocumentDTO {
         this.logMessage = logMessage;
     }
 
-    public String getDescription() {
-        return description;
+    public String getUei() {
+        return uei;
     }
 
-    public void setDescription(String description) {
-        this.description = description;
+    public void setUei(String uei) {
+        this.uei = uei;
     }
 
     @Override
     public String toString() {
         return "EventDocumentDTO{" +
-                "uei='" + uei + '\'' +
+                "description='" + description + '\'' +
                 ", id=" + id +
                 ", logMessage='" + logMessage + '\'' +
-                ", description='" + description + '\'' +
+                ", uei='" + uei + '\'' +
                 '}';
     }
 }

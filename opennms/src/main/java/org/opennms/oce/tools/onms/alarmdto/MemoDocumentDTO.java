@@ -32,23 +32,14 @@ import com.google.gson.annotations.SerializedName;
 
 public class MemoDocumentDTO {
 
-    @SerializedName("body")
-    private String body;
-
     @SerializedName("author")
     private String author;
 
-    @SerializedName("update-time")
+    @SerializedName("body")
+    private String body;
+
+    @SerializedName("update_time")
     private Long updateTime;
-
-
-    public String getBody() {
-        return body;
-    }
-
-    public void setBody(String body) {
-        this.body = body;
-    }
 
     public String getAuthor() {
         return author;
@@ -56,6 +47,14 @@ public class MemoDocumentDTO {
 
     public void setAuthor(String author) {
         this.author = author;
+    }
+
+    public String getBody() {
+        return body;
+    }
+
+    public void setBody(String body) {
+        this.body = body;
     }
 
     public Long getUpdateTime() {
@@ -69,8 +68,8 @@ public class MemoDocumentDTO {
     @Override
     public String toString() {
         return "MemoDocumentDTO{" +
-                "body='" + body + '\'' +
-                ", author='" + author + '\'' +
+                "author='" + author + '\'' +
+                ", body='" + body + '\'' +
                 ", updateTime=" + updateTime +
                 '}';
     }

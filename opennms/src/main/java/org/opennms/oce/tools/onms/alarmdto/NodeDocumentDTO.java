@@ -30,24 +30,49 @@ package org.opennms.oce.tools.onms.alarmdto;
 
 import java.util.List;
 
+import com.google.common.collect.ImmutableList;
 import com.google.gson.annotations.SerializedName;
 
 public class NodeDocumentDTO {
 
+    @SerializedName("categories")
+    private List<String> categories;
+
+    @SerializedName("foreign_id")
+    private String foreignId;
+
+    @SerializedName("foreign_source")
+    private String foreignSource;
+    
     @SerializedName("id")
     private Integer id;
 
     @SerializedName("label")
     private String label;
 
-    @SerializedName("foreign-source")
-    private String foreignSource;
+    public List<String> getCategories() {
+        return categories;
+    }
 
-    @SerializedName("foreign-id")
-    private String foreignId;
+    public void setCategories(List<String> categories) {
+        this.categories = categories == null ? null : ImmutableList.copyOf(categories);
+    }
 
-    @SerializedName("categories")
-    private List<String> categories;
+    public String getForeignId() {
+        return foreignId;
+    }
+
+    public void setForeignId(String foreignId) {
+        this.foreignId = foreignId;
+    }
+
+    public String getForeignSource() {
+        return foreignSource;
+    }
+
+    public void setForeignSource(String foreignSource) {
+        this.foreignSource = foreignSource;
+    }
 
     public Integer getId() {
         return id;
@@ -65,38 +90,14 @@ public class NodeDocumentDTO {
         this.label = label;
     }
 
-    public String getForeignSource() {
-        return foreignSource;
-    }
-
-    public void setForeignSource(String foreignSource) {
-        this.foreignSource = foreignSource;
-    }
-
-    public String getForeignId() {
-        return foreignId;
-    }
-
-    public void setForeignId(String foreignId) {
-        this.foreignId = foreignId;
-    }
-
-    public List<String> getCategories() {
-        return categories;
-    }
-
-    public void setCategories(List<String> categories) {
-        this.categories = categories;
-    }
-
     @Override
     public String toString() {
         return "NodeDocumentDTO{" +
-                "id=" + id +
-                ", label='" + label + '\'' +
-                ", foreignSource='" + foreignSource + '\'' +
+                "categories=" + categories +
                 ", foreignId='" + foreignId + '\'' +
-                ", categories=" + categories +
+                ", foreignSource='" + foreignSource + '\'' +
+                ", id=" + id +
+                ", label='" + label + '\'' +
                 '}';
     }
 }
