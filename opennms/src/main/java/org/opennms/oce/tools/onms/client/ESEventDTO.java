@@ -102,13 +102,13 @@ public class ESEventDTO {
     public void setP_oids(List<Map<String, String>> p_oids) {
         this.p_oids = p_oids;
     }
-    
+
     public Optional<String> getTrapTypeOid() {
-        if(p_oids != null && !p_oids.isEmpty()) {
+        if (p_oids != null && !p_oids.isEmpty()) {
             String trapTypeOid = ".1.3.6.1.6.3.1.1.4.3.0";
             for (Map<String, String> oidKv : p_oids) {
-                if (oidKv.containsKey(trapTypeOid)) {
-                    return Optional.of(oidKv.get(trapTypeOid));
+                if (oidKv.get("oid").equals(trapTypeOid)) {
+                    return Optional.of(oidKv.get("value"));
                 }
             }
         }

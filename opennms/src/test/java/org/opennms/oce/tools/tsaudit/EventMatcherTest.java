@@ -40,12 +40,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.opennms.oce.tools.cpn.events.MatchingSyslogEventRecord;
 import org.opennms.oce.tools.cpn.events.MatchingTrapEventRecord;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 
 public class EventMatcherTest {
+    @Ignore("Test used the grouping by host methods which are not tested")
     @Test
     public void testMatchingSyslogs() throws ExecutionException, InterruptedException {
         List<MatchingSyslogEventRecord> cpnSyslogs = new ArrayList<>();
@@ -70,13 +72,14 @@ public class EventMatcherTest {
         cpnSyslogs.add(s1);
         onmsSyslogs.add(e1);
 
-        Map<String, Integer> results = EventMatcher.matchSyslogEvents(cpnSyslogs, onmsSyslogs);
+        Map<String, Integer> results = EventMatcher.matchSyslogEventsScopedByTime(cpnSyslogs, onmsSyslogs);
         assertThat(results.get(cpnEventId), is(equalTo(onmsEventId)));
         e1.setNodeLabel("fail");
-        results = EventMatcher.matchSyslogEvents(cpnSyslogs, onmsSyslogs);
+        results = EventMatcher.matchSyslogEventsScopedByTime(cpnSyslogs, onmsSyslogs);
         assertThat(results.keySet(), hasSize(0));
     }
 
+    @Ignore("Test used the grouping by host methods which are not tested")
     @Test
     public void testMatchingTraps() {
         List<MatchingTrapEventRecord> cpnTraps = new ArrayList<>();
@@ -93,19 +96,40 @@ public class EventMatcherTest {
         Integer onmsId = 1;
         e1.setId(onmsId);
         e1.setNodeLabel(host);
-        e1.setTimestamp(ts);
+        e1.setTimestamp(new Date(ts.getTime() - 20000));
         setTrapTypeOid(e1, trapType);
+
+        ESEventDTO e2 = new ESEventDTO();
+        Integer onmsId2 = 2;
+        e2.setId(onmsId2);
+        e2.setNodeLabel(host);
+        e2.setTimestamp(new Date(ts.getTime() - 10000));
+        setTrapTypeOid(e2, trapType);
 
         cpnTraps.add(t1);
         onmsTraps.add(e1);
+        onmsTraps.add(e2);
 
-        Map<String, Integer> results = EventMatcher.matchTrapEvents(cpnTraps, onmsTraps);
-        assertThat(results.get(cpnId), is(equalTo(onmsId)));
+        Map<String, Integer> results = EventMatcher.matchTrapEventsScopedByTime(cpnTraps, onmsTraps);
+        // match 2 since it is closer in time
+        assertThat(results.get(cpnId), is(equalTo(onmsId2)));
+
+        // both hosts are now wrong
         e1.setNodeLabel("fail");
-        results = EventMatcher.matchTrapEvents(cpnTraps, onmsTraps);
+        e2.setNodeLabel("fail");
+
+        results = EventMatcher.matchTrapEventsScopedByTime(cpnTraps, onmsTraps);
         assertThat(results.keySet(), hasSize(0));
-        e1.setNodeLabel("host");
+
+        // right host, wrong trap type
+        e1.setNodeLabel(host);
         setTrapTypeOid(e1, ".4.5.6");
+
+        // right host, wrong time
+        e2.setNodeLabel(host);
+        e2.setTimestamp(new Date(ts.getTime() + 30001));
+
+        results = EventMatcher.matchTrapEventsScopedByTime(cpnTraps, onmsTraps);
         assertThat(results.keySet(), hasSize(0));
     }
 

@@ -99,6 +99,14 @@ public class GenericSyslogMessage {
                 Objects.equals(date, that.date);
     }
 
+    public boolean equalsIgnoringHost(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        GenericSyslogMessage that = (GenericSyslogMessage) o;
+        return Objects.equals(message, that.message) &&
+                Objects.equals(date, that.date);
+    }
+
     @Override
     public int hashCode() {
         return Objects.hash(host, message, date);

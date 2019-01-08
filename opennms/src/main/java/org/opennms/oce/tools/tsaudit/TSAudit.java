@@ -170,11 +170,11 @@ public class TSAudit {
 
             // Perform the matching
             LOG.info("Matching syslogs...");
-            Map<String, Integer> matchedSyslogs = EventMatcher.matchSyslogEvents(cpnSyslogEvents, onmsSyslogEvents);
+            Map<String, Integer> matchedSyslogs = EventMatcher.matchSyslogEventsScopedByTimeAndHost(cpnSyslogEvents, onmsSyslogEvents);
             LOG.info("Matched {} syslog events.", matchedSyslogs.size());
 
             LOG.info("Matching traps.");
-            Map<String, Integer> matchedTraps = EventMatcher.matchTrapEvents(cpnTrapEvents, onmsTrapEvents);
+            Map<String, Integer> matchedTraps = EventMatcher.matchTrapEventsScopedByTimeAndHost(cpnTrapEvents, onmsTrapEvents);
             LOG.info("Matched {} trap events.", matchedTraps.size());
         }
     }
