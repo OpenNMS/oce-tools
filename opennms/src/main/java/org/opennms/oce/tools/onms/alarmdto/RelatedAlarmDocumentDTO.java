@@ -32,53 +32,37 @@ import com.google.gson.annotations.SerializedName;
 
 /**
  * The related alarm document contains a subset of the alarm fields.
- *
+ * <p>
  * The remaining attributes can be retrieved directly from the document representing the related alarm.
  */
 public class RelatedAlarmDocumentDTO {
 
+    @SerializedName("first_event_time")
+    private Long firstEventTime;
+
     @SerializedName("id")
     private Integer id;
 
-    @SerializedName("reduction-key")
-    private String reductionKey;
-
-    @SerializedName("first-event-time")
-    private Long firstEventTime;
-
-    @SerializedName("last-event-time")
-    private Long lastEventTime;
-
-    @SerializedName("last-event")
+    @SerializedName("last_event")
     private EventDocumentDTO lastEvent;
 
-    @SerializedName("severity-id")
-    private Integer severityId;
+    @SerializedName("last_event_time")
+    private Long lastEventTime;
 
-    @SerializedName("severity-label")
-    private String severityLabel;
-
-    @SerializedName("managed-object-instance")
+    @SerializedName("managed_object_instance")
     private String managedObjectInstance;
 
-    @SerializedName("managed-object-type")
+    @SerializedName("managed_object_type")
     private String managedObjectType;
 
-    public Integer getId() {
-        return id;
-    }
+    @SerializedName("reduction_key")
+    private String reductionKey;
 
-    public void setId(Integer id) {
-        this.id = id;
-    }
+    @SerializedName("severity_id")
+    private Integer severityId;
 
-    public String getReductionKey() {
-        return reductionKey;
-    }
-
-    public void setReductionKey(String reductionKey) {
-        this.reductionKey = reductionKey;
-    }
+    @SerializedName("severity_label")
+    private String severityLabel;
 
     public Long getFirstEventTime() {
         return firstEventTime;
@@ -88,12 +72,12 @@ public class RelatedAlarmDocumentDTO {
         this.firstEventTime = firstEventTime;
     }
 
-    public Long getLastEventTime() {
-        return lastEventTime;
+    public Integer getId() {
+        return id;
     }
 
-    public void setLastEventTime(Long lastEventTime) {
-        this.lastEventTime = lastEventTime;
+    public void setId(Integer id) {
+        this.id = id;
     }
 
     public EventDocumentDTO getLastEvent() {
@@ -104,20 +88,12 @@ public class RelatedAlarmDocumentDTO {
         this.lastEvent = lastEvent;
     }
 
-    public Integer getSeverityId() {
-        return severityId;
+    public Long getLastEventTime() {
+        return lastEventTime;
     }
 
-    public void setSeverityId(Integer severityId) {
-        this.severityId = severityId;
-    }
-
-    public String getSeverityLabel() {
-        return severityLabel;
-    }
-
-    public void setSeverityLabel(String severityLabel) {
-        this.severityLabel = severityLabel;
+    public void setLastEventTime(Long lastEventTime) {
+        this.lastEventTime = lastEventTime;
     }
 
     public String getManagedObjectInstance() {
@@ -136,18 +112,42 @@ public class RelatedAlarmDocumentDTO {
         this.managedObjectType = managedObjectType;
     }
 
+    public String getReductionKey() {
+        return reductionKey;
+    }
+
+    public void setReductionKey(String reductionKey) {
+        this.reductionKey = reductionKey;
+    }
+
+    public Integer getSeverityId() {
+        return severityId;
+    }
+
+    public void setSeverityId(Integer severityId) {
+        this.severityId = severityId;
+    }
+
+    public String getSeverityLabel() {
+        return severityLabel;
+    }
+
+    public void setSeverityLabel(String severityLabel) {
+        this.severityLabel = severityLabel;
+    }
+
     @Override
     public String toString() {
         return "RelatedAlarmDocumentDTO{" +
-                "id=" + id +
-                ", reductionKey='" + reductionKey + '\'' +
-                ", firstEventTime=" + firstEventTime +
-                ", lastEventTime=" + lastEventTime +
+                "firstEventTime=" + firstEventTime +
+                ", id=" + id +
                 ", lastEvent=" + lastEvent +
-                ", severityId=" + severityId +
-                ", severityLabel='" + severityLabel + '\'' +
+                ", lastEventTime=" + lastEventTime +
                 ", managedObjectInstance='" + managedObjectInstance + '\'' +
                 ", managedObjectType='" + managedObjectType + '\'' +
+                ", reductionKey='" + reductionKey + '\'' +
+                ", severityId=" + severityId +
+                ", severityLabel='" + severityLabel + '\'' +
                 '}';
     }
 }

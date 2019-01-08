@@ -28,7 +28,49 @@
 
 package org.opennms.oce.tools.onms.alarmdto;
 
-public enum MemoType {
-    STICKY,
-    JOURNAL
+import com.google.gson.annotations.SerializedName;
+
+public class MonitoringSystemDTO {
+    
+    @SerializedName("id")
+    private String id;
+
+    @SerializedName("label")
+    private String label;
+
+    @SerializedName("location")
+    private String location;
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getLabel() {
+        return label;
+    }
+
+    public void setLabel(String label) {
+        this.label = label;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
+    }
+
+    @Override
+    public String toString() {
+        return "MonitoringSystemDTO{" +
+                "id='" + id + '\'' +
+                ", label='" + label + '\'' +
+                ", location=" + location +
+                '}';
+    }
 }
