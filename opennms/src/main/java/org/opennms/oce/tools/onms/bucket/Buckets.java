@@ -1,6 +1,8 @@
 package org.opennms.oce.tools.onms.bucket;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -18,6 +20,7 @@ import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.cpn.model.TicketRecord;
 import org.opennms.oce.tools.es.ESClient;
 import org.opennms.oce.tools.es.ESClusterConfiguration;
+import org.opennms.oce.tools.es.ESConfigurationDao;
 import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
@@ -50,12 +53,9 @@ public class Buckets {
 
     // TODO - delete main method when done.
     public static void main(String[] args) {
-        ESClusterConfiguration clusterConfiguration = new ESClusterConfiguration();
-        clusterConfiguration.setName("es");
-        clusterConfiguration.setConnTimeout(30000);
-        clusterConfiguration.setUrl(System.getProperty("url"));
-        clusterConfiguration.setReadTimeout(120000);
-        clusterConfiguration.setOpennmsEventIndex(System.getProperty("event-index"));
+        File esConfigFile = Paths.get(System.getProperty("user.home"), ".oce", "es-config.yaml").toFile();
+        ESConfigurationDao dao = new ESConfigurationDao(esConfigFile);
+        ESClusterConfiguration clusterConfiguration = dao.getConfig().getFirstCluster();
 
         ESClient esClient = new ESClient(clusterConfiguration);
         ESDataProvider esDataProvider = new ESDataProvider(esClient);
