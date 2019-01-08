@@ -50,6 +50,9 @@ public class TSAuditCommand extends AbstractCommand {
     @Option(name = "--node", aliases = {"-n"}, usage = "Node labels")
     private List<String> nodes = new LinkedList<>();
 
+    @Option(name = "--csv", usage = "Output the tables in CSV format instead of pretty printing")
+    private boolean csvOutput = false;
+
     public TSAuditCommand() {
         super(NAME);
     }
@@ -62,7 +65,7 @@ public class TSAuditCommand extends AbstractCommand {
         EventClient eventClient = new EventClient(esClient);
 
         CommandUtils.DateRange range = CommandUtils.parseDateRange(from, to);
-        final TSAudit tsAudit = new TSAudit(esDataProvider, eventClient, range.getStart(), range.getEnd(), nodes);
+        final TSAudit tsAudit = new TSAudit(esDataProvider, eventClient, range.getStart(), range.getEnd(), nodes, csvOutput);
         tsAudit.run();
     }
 }

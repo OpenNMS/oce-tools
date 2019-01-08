@@ -32,6 +32,7 @@ import static org.elasticsearch.index.query.QueryBuilders.matchPhraseQuery;
 import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 
 import java.io.IOException;
+import java.io.StringWriter;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -48,6 +49,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.cpn.EventUtils;
@@ -71,8 +74,9 @@ public class TSAudit {
     private final long endMs;
     private final List<String> nodes;
     private final StateCache stateCache;
+    private final boolean csvOutput;
 
-    public TSAudit(ESDataProvider esDataProvider, EventClient eventClient, ZonedDateTime start, ZonedDateTime end, List<String> nodes) {
+    public TSAudit(ESDataProvider esDataProvider, EventClient eventClient, ZonedDateTime start, ZonedDateTime end, List<String> nodes, boolean csvOutput) {
         this.esDataProvider = Objects.requireNonNull(esDataProvider);
         this.eventClient = Objects.requireNonNull(eventClient);
 
@@ -82,6 +86,7 @@ public class TSAudit {
         this.endMs = end.toInstant().toEpochMilli();
 
         this.nodes = Objects.requireNonNull(nodes);
+        this.csvOutput = csvOutput;
 
         this.stateCache = new StateCache(startMs, endMs);
     }
@@ -94,7 +99,13 @@ public class TSAudit {
             System.out.println("No nodes found.");
             return;
         }
-        printNodesAndFactsAsTable(nodesAndFacts);
+
+        // Render the results
+        if (csvOutput) {
+            printNodesAndFactsAsCsv(nodesAndFacts);
+        } else {
+            printNodesAndFactsAsTable(nodesAndFacts);
+        }
 
         // Determine the subset of nodes that should be processed
         final List<NodeAndFacts> nodesToProcess = nodesAndFacts.stream()
@@ -238,11 +249,10 @@ public class TSAudit {
         LOG.debug("Clock skew results for hostname: {}, status: {}, skew: {}", nodeAndFacts.getCpnHostname(), clockSkewStatus, clockSkew);
     }
 
-    private static void printNodesAndFactsAsTable(List<NodeAndFacts> nodesAndFacts) {
-        AsciiTable at = new AsciiTable();
-        at.addRule();
-        at.addRow("Index", "CPN Hostname", "OpenNMS Node Label", "OpenNMS Node ID", "OpenNMS Syslogs", "OpenNMS Traps", "CPN Syslogs", "CPN Traps", "Clock Skew", "Process?");
-        at.addRule();
+    private static List<List<String>> nodesAndFactsAsTable(List<NodeAndFacts> nodesAndFacts) {
+        List<List<String>> rows = new LinkedList<>();
+        List<String> header = Arrays.asList("Index", "CPN Hostname", "OpenNMS Node Label", "OpenNMS Node ID", "OpenNMS Syslogs", "OpenNMS Traps", "CPN Syslogs", "CPN Traps", "Clock Skew", "Process?");
+        rows.add(header);
         int k = 1;
         for (NodeAndFacts n : nodesAndFacts) {
             String clockSkewString = "Indeterminate";
@@ -251,9 +261,7 @@ public class TSAudit {
             } else if (NodeAndFacts.ClockSkewStatus.NOT_DETECTED.equals(n.getClockSkewStatus())) {
                 clockSkewString = "No";
             }
-
-            at.addRow(k,
-                    n.getCpnHostname(),
+            List<String> row = Arrays.asList(Integer.toString(k), n.getCpnHostname(),
                     naWhenNull(n.getOpennmsNodeLabel()),
                     naWhenNull(n.getOpennmsNodeId()),
                     naWhenNull(n.getNumOpennmsSyslogs()),
@@ -262,14 +270,43 @@ public class TSAudit {
                     naWhenNull(n.getNumCpnTraps()),
                     clockSkewString,
                     n.shouldProcess() ? "Yes" : "No");
-            at.addRule();
             k++;
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private static void printNodesAndFactsAsTable(List<NodeAndFacts> nodesAndFacts) {
+        final List<List<String>> rows = nodesAndFactsAsTable(nodesAndFacts);
+        AsciiTable at = new AsciiTable();
+        at.addRule();
+        at.addRow(rows.get(0).toArray(new String[0]));
+        at.addRule();
+        for (List<String> row : rows.subList(1, rows.size())) {
+            at.addRow(row.toArray(new String[0]));
+            at.addRule();
         }
 
         CWC_LongestLine cwc = new CWC_LongestLine();
         at.getRenderer().setCWC(cwc);
 
         System.out.println(at.render());
+    }
+
+    private static void printNodesAndFactsAsCsv(List<NodeAndFacts> nodesAndFacts) {
+        final List<List<String>> rows = nodesAndFactsAsTable(nodesAndFacts);
+        try (
+                StringWriter writer = new StringWriter();
+                CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT
+                        .withHeader(rows.get(0).toArray(new String[0])));
+        ) {
+            for (List<String> row : rows.subList(1, rows.size())) {
+                csvPrinter.printRecord(row.toArray(new String[0]));
+            }
+            System.out.println(writer);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static String naWhenNull(String text) {
