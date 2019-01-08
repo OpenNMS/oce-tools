@@ -196,12 +196,12 @@ public class EventClient {
         return matchedEvents;
     }
 
-    public Optional<ESEventDTO> findFirstEventForHostname(long startMs, long endMs, String hostname) throws IOException {
+    public Optional<ESEventDTO> findFirstEventForNodeLabelPrefix(long startMs, long endMs, String nodeLabelPrefix) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.sort("@timestamp", SortOrder.ASC);
         searchSourceBuilder.size(1); // limit to 1
         searchSourceBuilder.query(boolQuery()
-                .must(prefixQuery("nodelabel", hostname))
+                .must(prefixQuery("nodelabel", nodeLabelPrefix))
                 .must(rangeQuery("@timestamp").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
         final Search search = new Search.Builder(searchSourceBuilder.toString())
                 .addIndex(esClusterConfiguration.getOpennmsEventIndex())

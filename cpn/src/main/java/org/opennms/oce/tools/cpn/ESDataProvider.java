@@ -49,6 +49,7 @@ import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.index.search.MultiMatchQuery;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.sort.SortOrder;
@@ -266,20 +267,25 @@ public class ESDataProvider {
         return allEventsInTicket;
     }
 
-    public long getNumSyslogEvents(ZonedDateTime startTime, ZonedDateTime endTime, String hostname) throws IOException {
-        return getNumEventsForHostname(startTime, endTime, hostname, "syslogs", "syslog");
+    public long getNumSyslogEvents(ZonedDateTime startTime, ZonedDateTime endTime, String hostname, List<QueryBuilder> excludeQueries) throws IOException {
+        return getNumEventsForHostname(startTime, endTime, hostname, excludeQueries, "syslogs", "syslog");
     }
 
-    public long getNumTrapEvents(ZonedDateTime startTime, ZonedDateTime endTime, String hostname) throws IOException {
-        return getNumEventsForHostname(startTime, endTime, hostname, "traps", "trap");
+    public long getNumTrapEvents(ZonedDateTime startTime, ZonedDateTime endTime, String hostname, List<QueryBuilder> excludeQueries) throws IOException {
+        return getNumEventsForHostname(startTime, endTime, hostname, excludeQueries, "traps", "trap");
     }
 
-    public long getNumEventsForHostname(ZonedDateTime startTime, ZonedDateTime endTime, String hostname, String index, String type) throws IOException {
+    public long getNumEventsForHostname(ZonedDateTime startTime, ZonedDateTime endTime, String hostname, List<QueryBuilder> excludeQueries, String index, String type) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.size(0); // we don't need the results, only the count
-        searchSourceBuilder.query(QueryBuilders.boolQuery()
+        final BoolQueryBuilder boolQuery = QueryBuilders.boolQuery()
                 .must(matchPhraseQuery("location", hostname))
-                .must(rangeQuery("time").gte(startTime.toEpochSecond()).lte(endTime.toEpochSecond()).includeLower(true).includeUpper(true).format("epoch_second")));
+                .must(rangeQuery("time").gte(startTime.toEpochSecond()).lte(endTime.toEpochSecond()).includeLower(true).includeUpper(true).format("epoch_second"));
+        // Add excludes
+        for (QueryBuilder excludeQuery : excludeQueries) {
+            boolQuery.mustNot(excludeQuery);
+        }
+        searchSourceBuilder.query(boolQuery);
         final Search search = new Search.Builder(searchSourceBuilder.toString())
                 .addIndex(index)
                 .addType(type)
@@ -291,42 +297,31 @@ public class ESDataProvider {
         return result.getTotal();
     }
 
-    public void getDistinctLocations(ZonedDateTime startTime, ZonedDateTime endTime, Consumer<List<String>> callback) throws IOException {
-        String query = "{\n" +
-                "\t\"size\": \"0\",\n" +
-                "\t\"query\": {\n" +
-                "\t\t\"bool\": {\n" +
-                "\t\t\t\"filter\": [{\n" +
-                "\t\t\t\t\t\"range\": {\n" +
-                "\t\t\t\t\t\t\"time\": {\n" +
-                "\t\t\t\t\t\t\t\"gte\": " + startTime.toEpochSecond() + ",\n" +
-                "\t\t\t\t\t\t\t\"format\": \"epoch_second\"\n" +
-                "\t\t\t\t\t\t}\n" +
-                "\t\t\t\t\t}\n" +
-                "\t\t\t\t},\n" +
-                "\t\t\t\t{\n" +
-                "\t\t\t\t\t\"range\": {\n" +
-                "\t\t\t\t\t\t\"time\": {\n" +
-                "\t\t\t\t\t\t\t\"lte\": " + endTime.toEpochSecond() + ",\n" +
-                "\t\t\t\t\t\t\t\"format\": \"epoch_second\"\n" +
-                "\t\t\t\t\t\t}\n" +
-                "\t\t\t\t\t}\n" +
-                "\t\t\t\t}\n" +
-                "\t\t\t]\n" +
-                "\t\t}\n" +
-                "\t},\n" +
-                "\t\"aggs\": {\n" +
-                "\t\t\"uniq_location\": {\n" +
-                "\t\t\t\"terms\": {\n" +
-                "\t\t\t\t\"field\": \"location.keyword\",\n" +
-                "\t\t\t\t\"size\": 100000\n" + // FIXME: What if there are more?
-                "\t\t\t}\n" +
-                "\t\t}\n" +
-                "\t}\n" +
-                "}";
+    public void getDistinctLocations(ZonedDateTime startTime, ZonedDateTime endTime, List<QueryBuilder> excludeQueries, Consumer<List<String>> callback) throws IOException {
+
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        final BoolQueryBuilder boolQuery = new BoolQueryBuilder();
+        boolQuery.mustNot(QueryBuilders.matchQuery("ticketId", ""));
+        final RangeQueryBuilder rangeQueryBuilder = new RangeQueryBuilder("time")
+                .gte(startTime.toEpochSecond())
+                .lt(endTime.toEpochSecond())
+                .format("epoch_second");
+        boolQuery.must(rangeQueryBuilder);
+        // Add excludes
+        for (QueryBuilder excludeQuery : excludeQueries) {
+            boolQuery.mustNot(excludeQuery);
+        }
+        searchSourceBuilder.query(boolQuery);
+
+        AggregationBuilder termsAgg = AggregationBuilders.terms("uniq_location")
+                .field("location.keyword")
+                .size(100000); // FIXME: What if there are more?
+
+        searchSourceBuilder.aggregation(termsAgg);
+        searchSourceBuilder.size(0);
 
         // Search for syslogs
-        Search search = new Search.Builder(query)
+        Search search = new Search.Builder(searchSourceBuilder.toString())
                 .addIndex("syslogs")
                 .addType("syslog")
                 .build();
@@ -339,7 +334,7 @@ public class ESDataProvider {
         callback.accept(locations);
 
         // Search for traps
-        search = new Search.Builder(query)
+        search = new Search.Builder(searchSourceBuilder.toString())
                 .addIndex("traps")
                 .addType("trap")
                 .build();

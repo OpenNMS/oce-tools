@@ -29,9 +29,11 @@
 package org.opennms.oce.tools.tsaudit;
 
 import static org.elasticsearch.index.query.QueryBuilders.matchPhraseQuery;
+import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 
 import java.io.IOException;
 import java.time.ZonedDateTime;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashSet;
@@ -46,6 +48,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import org.elasticsearch.index.query.QueryBuilder;
 import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.cpn.EventUtils;
 import org.opennms.oce.tools.cpn.model.EventRecord;
@@ -104,10 +107,13 @@ public class TSAudit {
     private List<NodeAndFacts> getNodesAndFacts() throws IOException {
         final List<NodeAndFacts> nodesAndFacts = new LinkedList<>();
 
+        // Don't consider authentication failure traps
+        List<QueryBuilder> cpnEventExcludes = Arrays.asList(termQuery("description.keyword", "SNMP authentication failure"));
+
         // Build the unique set of hostnames by scrolling through all locations and extracting
         // the hostname portion
         final Set<String> hostnames = new LinkedHashSet<>();
-        esDataProvider.getDistinctLocations(start, end, locations -> {
+        esDataProvider.getDistinctLocations(start, end, cpnEventExcludes, locations -> {
             for (String location : locations) {
                 hostnames.add(EventUtils.getNodeLabelFromLocation(location));
             }
@@ -128,8 +134,8 @@ public class TSAudit {
             }
 
             // Count the number of syslogs and traps received in CPN
-            nodeAndFacts.setNumCpnSyslogs(esDataProvider.getNumSyslogEvents(start, end, nodeAndFacts.getCpnHostname()));
-            nodeAndFacts.setNumCpnTraps(esDataProvider.getNumTrapEvents(start, end, nodeAndFacts.getCpnHostname()));
+            nodeAndFacts.setNumCpnSyslogs(esDataProvider.getNumSyslogEvents(start, end, nodeAndFacts.getCpnHostname(), cpnEventExcludes));
+            nodeAndFacts.setNumCpnTraps(esDataProvider.getNumTrapEvents(start, end, nodeAndFacts.getCpnHostname(), cpnEventExcludes));
 
             // Count the number of syslogs and traps received in OpenNMS
             nodeAndFacts.setNumOpennmsSyslogs(eventClient.getNumSyslogEvents(startMs, endMs, nodeAndFacts.getOpennmsNodeId()));
@@ -157,7 +163,7 @@ public class TSAudit {
             return;
         }
 
-        final Optional<ESEventDTO> firstEvent = eventClient.findFirstEventForHostname(startMs, endMs,
+        final Optional<ESEventDTO> firstEvent = eventClient.findFirstEventForNodeLabelPrefix(startMs, endMs,
                 nodeAndFacts.getCpnHostname());
         if (firstEvent.isPresent()) {
             final ESEventDTO event = firstEvent.get();
