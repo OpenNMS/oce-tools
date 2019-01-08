@@ -28,19 +28,27 @@
 
 package org.opennms.oce.tools.tsaudit;
 
+import static org.elasticsearch.index.query.QueryBuilders.matchPhraseQuery;
+
 import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.cpn.EventUtils;
+import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
 import org.slf4j.Logger;
@@ -126,6 +134,11 @@ public class TSAudit {
             // Count the number of syslogs and traps received in OpenNMS
             nodeAndFacts.setNumOpennmsSyslogs(eventClient.getNumSyslogEvents(startMs, endMs, nodeAndFacts.getOpennmsNodeId()));
             nodeAndFacts.setNumOpennmsTraps(eventClient.getNumTrapEvents(startMs, endMs, nodeAndFacts.getOpennmsNodeId()));
+
+            // Detect clock skew if we have 1+ syslog messages from both CPN and OpenNMS
+            if (nodeAndFacts.getNumCpnSyslogs() > 0 && nodeAndFacts.getNumOpennmsSyslogs() > 0) {
+                detectClockSkewUsingSyslogEvents(nodeAndFacts);
+            }
         }
 
         // Sort
@@ -158,13 +171,81 @@ public class TSAudit {
         stateCache.saveOpennmsNodeInfo(nodeAndFacts);
     }
 
+    private void detectClockSkewUsingSyslogEvents(NodeAndFacts nodeAndFacts) throws IOException {
+        LOG.debug("Detecting clock skew for hostname: {}", nodeAndFacts.getCpnHostname());
+        final List<Long> deltas = new LinkedList<>();
+        final AtomicReference<Date> minTimeRef = new AtomicReference<>(new Date());
+        final AtomicReference<Date> maxTimeRef = new AtomicReference<>(new Date(0));
+
+        // Retrieve syslog records for the given host
+        esDataProvider.getSyslogRecordsInRange(start, end, syslogs -> {
+            for (EventRecord syslog : syslogs) {
+                // Skip clears
+                if (EventUtils.isClear(syslog)) {
+                    continue;
+                }
+
+                Date processedTime = syslog.getTime();
+                Date messageTime;
+
+                // Parse the syslog record and extract the date from the message
+                try {
+                    GenericSyslogMessage parsedSyslogMessage = GenericSyslogMessage.fromCpn(nodeAndFacts.getCpnHostname(), syslog.getDetailedDescription());
+                    messageTime = parsedSyslogMessage.getDate();
+                } catch (ExecutionException|InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+
+                // Compute the delta between the message date, and the time at which the event was processed
+                deltas.add(Math.abs(processedTime.getTime() - messageTime.getTime()));
+
+                // Keep track of the min and max times
+                if (processedTime.compareTo(minTimeRef.get()) < 0) {
+                    minTimeRef.set(processedTime);
+                }
+                if (processedTime.compareTo(maxTimeRef.get()) > 0) {
+                    maxTimeRef.set(processedTime);
+                }
+
+            }
+        }, matchPhraseQuery("location", nodeAndFacts.getCpnHostname()));
+
+
+        NodeAndFacts.ClockSkewStatus clockSkewStatus = NodeAndFacts.ClockSkewStatus.INDETERMINATE;
+        Long clockSkew = null;
+
+        // Ensure we have at least 3 samples and that the messages span at least 10 minutes
+        if (deltas.size() > 3 && Math.abs(maxTimeRef.get().getTime() - minTimeRef.get().getTime()) >= TimeUnit.MINUTES.toMillis(10)) {
+            OptionalDouble avg = deltas.stream()
+                    .mapToLong(d -> d)
+                    .average();
+            if (avg.isPresent() && avg.getAsDouble() > TimeUnit.SECONDS.toMillis(30)) {
+                clockSkewStatus = NodeAndFacts.ClockSkewStatus.DETECTED;
+                clockSkew = new Double(avg.getAsDouble()).longValue();
+            } else {
+                clockSkewStatus = NodeAndFacts.ClockSkewStatus.NOT_DETECTED;
+            }
+        }
+
+        nodeAndFacts.setClockSkewStatus(clockSkewStatus);
+        nodeAndFacts.setClockSkew(clockSkew);
+        LOG.debug("Clock skew results for hostname: {}, status: {}, skew: {}", nodeAndFacts.getCpnHostname(), clockSkewStatus, clockSkew);
+    }
+
     private static void printNodesAndFactsAsTable(List<NodeAndFacts> nodesAndFacts) {
         AsciiTable at = new AsciiTable();
         at.addRule();
-        at.addRow("Index", "CPN Hostname", "OpenNMS Node Label", "OpenNMS Node ID", "OpenNMS Syslogs", "OpenNMS Traps", "CPN Syslogs", "CPN Traps", "Process?");
+        at.addRow("Index", "CPN Hostname", "OpenNMS Node Label", "OpenNMS Node ID", "OpenNMS Syslogs", "OpenNMS Traps", "CPN Syslogs", "CPN Traps", "Clock Skew", "Process?");
         at.addRule();
         int k = 1;
         for (NodeAndFacts n : nodesAndFacts) {
+            String clockSkewString = "Indeterminate";
+            if (NodeAndFacts.ClockSkewStatus.DETECTED.equals(n.getClockSkewStatus())) {
+                clockSkewString = String.format("Yes (%d ms)", n.getClockSkew());
+            } else if (NodeAndFacts.ClockSkewStatus.NOT_DETECTED.equals(n.getClockSkewStatus())) {
+                clockSkewString = "No";
+            }
+
             at.addRow(k,
                     n.getCpnHostname(),
                     naWhenNull(n.getOpennmsNodeLabel()),
@@ -173,6 +254,7 @@ public class TSAudit {
                     naWhenNull(n.getNumOpennmsTraps()),
                     naWhenNull(n.getNumCpnSyslogs()),
                     naWhenNull(n.getNumCpnTraps()),
+                    clockSkewString,
                     n.shouldProcess() ? "Yes" : "No");
             at.addRule();
             k++;

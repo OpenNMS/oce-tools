@@ -69,6 +69,18 @@ public class GenericSyslogMessage {
         return syslogs.stream().anyMatch(syslog -> syslog.equals(this));
     }
 
+    public String getHost() {
+        return host;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public Date getDate() {
+        return date;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

@@ -44,8 +44,10 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
+import org.elasticsearch.index.search.MultiMatchQuery;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
@@ -229,7 +231,7 @@ public class ESDataProvider {
         getSyslogRecords(searchSourceBuilder.toString(), callback);
     }
 
-    public void getSyslogRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, Consumer<List<EventRecord>> callback) throws IOException {
+    public void getSyslogRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, Consumer<List<EventRecord>> callback, QueryBuilder... queries) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         final BoolQueryBuilder boolQuery = new BoolQueryBuilder();
         boolQuery.mustNot(QueryBuilders.matchQuery("ticketId", ""));
@@ -238,6 +240,9 @@ public class ESDataProvider {
                 .lt(endTime.toEpochSecond())
                 .format("epoch_second");
         boolQuery.must(rangeQueryBuilder);
+        for (QueryBuilder query : queries) {
+            boolQuery.must(query);
+        }
         searchSourceBuilder.query(boolQuery);
         searchSourceBuilder.size(BATCH_SIZE);
         getSyslogRecords(searchSourceBuilder.toString(), callback);

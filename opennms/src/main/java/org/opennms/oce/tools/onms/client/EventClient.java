@@ -28,6 +28,8 @@
 
 package org.opennms.oce.tools.onms.client;
 
+import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
+import static org.elasticsearch.index.query.QueryBuilders.existsQuery;
 import static org.elasticsearch.index.query.QueryBuilders.matchQuery;
 import static org.elasticsearch.index.query.QueryBuilders.nestedQuery;
 import static org.elasticsearch.index.query.QueryBuilders.prefixQuery;
@@ -46,6 +48,7 @@ import java.util.stream.Collectors;
 
 import org.apache.lucene.search.join.ScoreMode;
 import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
@@ -145,7 +148,7 @@ public class EventClient {
 
     public List<ESEventDTO> getTrapEvents(long startMs, long endMs, String hostname, String trapTypeOid) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(QueryBuilders.boolQuery()
+        searchSourceBuilder.query(boolQuery()
                 .must(prefixQuery("nodelabel", hostname))
                 .must(nestedQuery("p_oids", termQuery("p_oids.value",trapTypeOid), ScoreMode.None))
                 .must(rangeQuery("@timestamp").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
@@ -197,7 +200,7 @@ public class EventClient {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.sort("@timestamp", SortOrder.ASC);
         searchSourceBuilder.size(1); // limit to 1
-        searchSourceBuilder.query(QueryBuilders.boolQuery()
+        searchSourceBuilder.query(boolQuery()
                 .must(prefixQuery("nodelabel", hostname))
                 .must(rangeQuery("@timestamp").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
         final Search search = new Search.Builder(searchSourceBuilder.toString())
@@ -212,20 +215,20 @@ public class EventClient {
     }
 
     public long getNumSyslogEvents(long startMs, long endMs, int nodeId) throws IOException {
-        return getNumEventsForSource(startMs, endMs, nodeId, "syslogd");
+        return getNumEventsForMatching(startMs, endMs, nodeId, termQuery("eventsource", "syslogd"));
     }
 
     public long getNumTrapEvents(long startMs, long endMs, int nodeId) throws IOException {
-        return getNumEventsForSource(startMs, endMs, nodeId, "trapd") + getNumEventsForSource(startMs, endMs, nodeId, "event-translator");
+        return getNumEventsForMatching(startMs, endMs, nodeId, nestedQuery("p_oids", boolQuery().must(existsQuery("p_oids")), ScoreMode.None));
     }
 
-    public long getNumEventsForSource(long startMs, long endMs, int nodeId, String eventSource) throws IOException {
+    public long getNumEventsForMatching(long startMs, long endMs, int nodeId, QueryBuilder queryBuilder) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.sort("@timestamp", SortOrder.ASC);
         searchSourceBuilder.size(0); // we don't need the results, only the count
-        searchSourceBuilder.query(QueryBuilders.boolQuery()
+        searchSourceBuilder.query(boolQuery()
                 .must(termQuery("nodeid", nodeId))
-                .must(termQuery("eventsource", eventSource))
+                .must(queryBuilder)
                 .must(rangeQuery("@timestamp").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
         final Search search = new Search.Builder(searchSourceBuilder.toString())
                 .addIndex(esClusterConfiguration.getOpennmsEventIndex())

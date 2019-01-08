@@ -31,10 +31,18 @@ package org.opennms.oce.tools.tsaudit;
 import java.util.Objects;
 
 public class NodeAndFacts {
+
+    public static enum ClockSkewStatus {
+        INDETERMINATE,
+        DETECTED,
+        NOT_DETECTED
+    }
+
     private final String cpnHostname;
     private String opennmsNodeLabel;
     private Integer opennmsNodeId;
-    private Boolean clockSkewDetected;
+    private ClockSkewStatus clockSkewStatus;
+    private Long clockSkew;
     private Long numOpennmsSyslogs;
     private Long numOpennmsTraps;
     private Long numCpnSyslogs;
@@ -100,12 +108,20 @@ public class NodeAndFacts {
         this.numCpnTraps = numCpnTraps;
     }
 
-    public Boolean getClockSkewDetected() {
-        return clockSkewDetected;
+    public ClockSkewStatus getClockSkewStatus() {
+        return clockSkewStatus;
     }
 
-    public void setClockSkewDetected(Boolean clockSkewDetected) {
-        this.clockSkewDetected = clockSkewDetected;
+    public void setClockSkewStatus(ClockSkewStatus clockSkewStatus) {
+        this.clockSkewStatus = clockSkewStatus;
+    }
+
+    public Long getClockSkew() {
+        return clockSkew;
+    }
+
+    public void setClockSkew(Long clockSkew) {
+        this.clockSkew = clockSkew;
     }
 
     public boolean shouldProcess() {
@@ -120,6 +136,12 @@ public class NodeAndFacts {
         if (getNumCpnSyslogs() != null && getNumOpennmsSyslogs() != null && getNumCpnSyslogs() > 0 && getNumOpennmsSyslogs() <= 0) {
             return false;
         }
+
+        // don't process nodes where clock skew was detected
+        if (ClockSkewStatus.DETECTED.equals(getClockSkewStatus())) {
+            return false;
+        }
+
         return true;
     }
 
@@ -131,7 +153,8 @@ public class NodeAndFacts {
         return Objects.equals(cpnHostname, that.cpnHostname) &&
                 Objects.equals(opennmsNodeLabel, that.opennmsNodeLabel) &&
                 Objects.equals(opennmsNodeId, that.opennmsNodeId) &&
-                Objects.equals(clockSkewDetected, that.clockSkewDetected) &&
+                clockSkewStatus == that.clockSkewStatus &&
+                Objects.equals(clockSkew, that.clockSkew) &&
                 Objects.equals(numOpennmsSyslogs, that.numOpennmsSyslogs) &&
                 Objects.equals(numOpennmsTraps, that.numOpennmsTraps) &&
                 Objects.equals(numCpnSyslogs, that.numCpnSyslogs) &&
@@ -140,7 +163,7 @@ public class NodeAndFacts {
 
     @Override
     public int hashCode() {
-        return Objects.hash(cpnHostname, opennmsNodeLabel, opennmsNodeId, clockSkewDetected, numOpennmsSyslogs, numOpennmsTraps, numCpnSyslogs, numCpnTraps);
+        return Objects.hash(cpnHostname, opennmsNodeLabel, opennmsNodeId, clockSkewStatus, clockSkew, numOpennmsSyslogs, numOpennmsTraps, numCpnSyslogs, numCpnTraps);
     }
 
     @Override
@@ -149,7 +172,8 @@ public class NodeAndFacts {
                 "cpnHostname='" + cpnHostname + '\'' +
                 ", opennmsNodeLabel='" + opennmsNodeLabel + '\'' +
                 ", opennmsNodeId=" + opennmsNodeId +
-                ", clockSkewDetected=" + clockSkewDetected +
+                ", clockSkewStatus=" + clockSkewStatus +
+                ", clockSkew=" + clockSkew +
                 ", numOpennmsSyslogs=" + numOpennmsSyslogs +
                 ", numOpennmsTraps=" + numOpennmsTraps +
                 ", numCpnSyslogs=" + numCpnSyslogs +

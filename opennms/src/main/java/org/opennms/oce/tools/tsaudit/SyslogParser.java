@@ -29,10 +29,14 @@
 package org.opennms.oce.tools.tsaudit;
 
 import java.nio.ByteBuffer;
+import java.time.DateTimeException;
+import java.time.ZonedDateTime;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
+import org.opennms.core.time.ZonedDateTimeBuilder;
 import org.opennms.netmgt.syslogd.ByteBufferParser;
 import org.opennms.netmgt.syslogd.RadixTreeSyslogParser;
 import org.opennms.netmgt.syslogd.SyslogMessage;
@@ -46,32 +50,39 @@ class SyslogParser {
 
         // Attempt to set the date if it wasn't already set
         if (syslogMessage.getDate() == null) {
-            Calendar cal = Calendar.getInstance();
+            ZonedDateTimeBuilder zonedDateTimeBuilder = new ZonedDateTimeBuilder();
 
             if (syslogMessage.getYear() != null) {
-                cal.set(Calendar.YEAR, syslogMessage.getYear());
+                zonedDateTimeBuilder.setYear(syslogMessage.getYear());
             }
             if (syslogMessage.getMonth() != null) {
-                // Calendar months are 0 indexed so we need to subtract one month here
-                cal.set(Calendar.MONTH, syslogMessage.getMonth() - 1);
+                zonedDateTimeBuilder.setMonth(syslogMessage.getMonth());
             }
             if (syslogMessage.getDayOfMonth() != null) {
-                cal.set(Calendar.DAY_OF_MONTH, syslogMessage.getDayOfMonth());
+                zonedDateTimeBuilder.setDayOfMonth(syslogMessage.getDayOfMonth());
             }
             if (syslogMessage.getHourOfDay() != null) {
-                cal.set(Calendar.HOUR_OF_DAY, syslogMessage.getHourOfDay());
+                zonedDateTimeBuilder.setHourOfDay(syslogMessage.getHourOfDay());
             }
             if (syslogMessage.getMinute() != null) {
-                cal.set(Calendar.MINUTE, syslogMessage.getMinute());
+                zonedDateTimeBuilder.setMinute(syslogMessage.getMinute());
             }
             if (syslogMessage.getSecond() != null) {
-                cal.set(Calendar.SECOND, syslogMessage.getSecond());
+                zonedDateTimeBuilder.setSecond(syslogMessage.getSecond());
             }
             if (syslogMessage.getMillisecond() != null) {
-                cal.set(Calendar.MILLISECOND, syslogMessage.getMillisecond());
+                zonedDateTimeBuilder.setNanosecond(syslogMessage.getMillisecond() * 1000);
+            }
+            if (syslogMessage.getZoneId() != null) {
+                zonedDateTimeBuilder.setZoneId(syslogMessage.getZoneId());
             }
 
-            syslogMessage.setDate(cal.getTime());
+            try {
+                ZonedDateTime time = zonedDateTimeBuilder.build();
+                syslogMessage.setDate(Date.from(time.toInstant()));
+            } catch (DateTimeException e) {
+                e.printStackTrace();
+            }
         }
 
         return syslogMessage;
