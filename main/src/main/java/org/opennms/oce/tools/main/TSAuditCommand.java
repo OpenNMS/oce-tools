@@ -58,7 +58,7 @@ public class TSAuditCommand extends AbstractCommand {
     }
 
     @Override
-    public void doExec(Context context) throws IOException {
+    public void doExec(Context context) throws Exception {
         ESClient esClient = context.getEsClient();
         ESDataProvider esDataProvider = new ESDataProvider(esClient);
 

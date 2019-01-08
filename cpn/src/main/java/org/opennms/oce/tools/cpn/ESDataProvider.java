@@ -37,6 +37,7 @@ import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
@@ -169,6 +170,10 @@ public class ESDataProvider {
     }
 
     public void getTrapRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, Consumer<List<TrapRecord>> callback) throws IOException {
+        getTrapRecordsInRange(startTime, endTime, Collections.emptyList(), Collections.emptyList(), callback);
+    }
+
+    public void getTrapRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, List<QueryBuilder> includeQueries, List<QueryBuilder> excludeQueries, Consumer<List<TrapRecord>> callback) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         final BoolQueryBuilder boolQuery = new BoolQueryBuilder();
         boolQuery.mustNot(QueryBuilders.matchQuery("ticketId", ""));
@@ -178,6 +183,14 @@ public class ESDataProvider {
                 .lt(endTime.toEpochSecond())
                 .format("epoch_second");
         boolQuery.must(rangeQueryBuilder);
+        // Add includes
+        for (QueryBuilder includeQuery : includeQueries) {
+            boolQuery.must(includeQuery);
+        }
+        // Add excludes
+        for (QueryBuilder excludeQuery : excludeQueries) {
+            boolQuery.mustNot(excludeQuery);
+        }
         searchSourceBuilder.query(boolQuery);
         searchSourceBuilder.size(BATCH_SIZE);
         getTrapRecords(searchSourceBuilder.toString(), callback);
@@ -232,7 +245,11 @@ public class ESDataProvider {
         getSyslogRecords(searchSourceBuilder.toString(), callback);
     }
 
-    public void getSyslogRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, Consumer<List<EventRecord>> callback, QueryBuilder... queries) throws IOException {
+    public void getSyslogRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, Consumer<List<EventRecord>> callback) throws IOException {
+        getSyslogRecordsInRange(startTime, endTime, callback);
+    }
+
+    public void getSyslogRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, List<QueryBuilder> includeQueries, List<QueryBuilder> excludeQueries, Consumer<List<EventRecord>> callback, QueryBuilder... queries) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         final BoolQueryBuilder boolQuery = new BoolQueryBuilder();
         boolQuery.mustNot(QueryBuilders.matchQuery("ticketId", ""));
@@ -243,6 +260,14 @@ public class ESDataProvider {
         boolQuery.must(rangeQueryBuilder);
         for (QueryBuilder query : queries) {
             boolQuery.must(query);
+        }
+        // Add includes
+        for (QueryBuilder includeQuery : includeQueries) {
+            boolQuery.must(includeQuery);
+        }
+        // Add excludes
+        for (QueryBuilder excludeQuery : excludeQueries) {
+            boolQuery.mustNot(excludeQuery);
         }
         searchSourceBuilder.query(boolQuery);
         searchSourceBuilder.size(BATCH_SIZE);

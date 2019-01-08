@@ -34,12 +34,15 @@ import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -54,7 +57,10 @@ import org.apache.commons.csv.CSVPrinter;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.cpn.EventUtils;
+import org.opennms.oce.tools.cpn.events.MatchingSyslogEventRecord;
+import org.opennms.oce.tools.cpn.events.MatchingTrapEventRecord;
 import org.opennms.oce.tools.cpn.model.EventRecord;
+import org.opennms.oce.tools.cpn.model.TrapRecord;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
 import org.slf4j.Logger;
@@ -76,6 +82,9 @@ public class TSAudit {
     private final StateCache stateCache;
     private final boolean csvOutput;
 
+    // Don't consider authentication failure traps
+    private static final List<QueryBuilder> cpnEventExcludes = Arrays.asList(termQuery("description.keyword", "SNMP authentication failure"));
+
     public TSAudit(ESDataProvider esDataProvider, EventClient eventClient, ZonedDateTime start, ZonedDateTime end, List<String> hostnames, boolean csvOutput) {
         this.esDataProvider = Objects.requireNonNull(esDataProvider);
         this.eventClient = Objects.requireNonNull(eventClient);
@@ -91,7 +100,7 @@ public class TSAudit {
         this.stateCache = new StateCache(startMs, endMs);
     }
 
-    public void run() throws IOException {
+    public void run() throws IOException, ExecutionException, InterruptedException {
         // Build the complete list of nodes that have either trap or syslog events in CPN
         // in the given time range and and gather facts related to these
         final List<NodeAndFacts> nodesAndFacts = getNodesAndFacts();
@@ -112,14 +121,66 @@ public class TSAudit {
                 .filter(NodeAndFacts::shouldProcess)
                 .collect(Collectors.toList());
 
-        // TODO: Do something with the nodesToProcess
+        // Gather all the events of interest for the nodes we want to process
+        retrieveAndPairEvents(nodesToProcess);
+
+        // TODO: Evaluate the situations
+    }
+
+    private void retrieveAndPairEvents(List<NodeAndFacts> nodesAndFacts) throws IOException, ExecutionException, InterruptedException {
+        for (NodeAndFacts nodeAndFacts : nodesAndFacts) {
+            final List<MatchingSyslogEventRecord> cpnSyslogEvents = new ArrayList<>();
+            final List<MatchingTrapEventRecord> cpnTrapEvents = new ArrayList<>();
+            final List<ESEventDTO> onmsTrapEvents = new ArrayList<>();
+            final List<ESEventDTO> onmsSyslogEvents = new ArrayList<>();
+
+            // Retrieve syslog records for the given host
+            LOG.debug("Retrieving CPN syslog records for: {}", nodeAndFacts.getCpnHostname());
+            esDataProvider.getSyslogRecordsInRange(start, end, Arrays.asList(matchPhraseQuery("location", nodeAndFacts.getCpnHostname())), cpnEventExcludes,  syslogs -> {
+                for (EventRecord syslog : syslogs) {
+                    // Skip clears
+                    if (EventUtils.isClear(syslog)) {
+                        continue;
+                    }
+                    cpnSyslogEvents.add(syslog);
+                }
+            });
+
+            // Retrieve trap records for the given host
+            LOG.debug("Retrieving CPN trap records for: {}", nodeAndFacts.getCpnHostname());
+            esDataProvider.getTrapRecordsInRange(start, end, Arrays.asList(matchPhraseQuery("location", nodeAndFacts.getCpnHostname())), cpnEventExcludes,  traps -> {
+                for (TrapRecord trap : traps) {
+                    // Skip clears
+                    if (EventUtils.isClear(trap)) {
+                        continue;
+                    }
+                    cpnTrapEvents.add(trap);
+                }
+            });
+
+            // Retrieve the ONMS trap events
+            LOG.debug("Retrieving ONMS trap events for: {}", nodeAndFacts.getOpennmsNodeLabel());
+            onmsTrapEvents.addAll(eventClient.getTrapEvents(startMs, endMs, Arrays.asList(termQuery("nodeid", nodeAndFacts.getOpennmsNodeId()))));
+
+            // Retrieve the ONMS syslog events
+            LOG.debug("Retrieving ONMS syslog events for: {}", nodeAndFacts.getOpennmsNodeLabel());
+            onmsSyslogEvents.addAll(eventClient.getSyslogEvents(startMs, endMs, Arrays.asList(termQuery("nodeid", nodeAndFacts.getOpennmsNodeId()))));
+            LOG.debug("Done retrieving events for host. Found {} CPN syslogs, {} CPN traps, {} ONMS syslogs and {} ONMS traps.",
+                    cpnSyslogEvents.size(), cpnTrapEvents.size(), onmsSyslogEvents.size(), onmsTrapEvents.size());
+
+            // Perform the matching
+            LOG.info("Matching syslogs...");
+            Map<String, Integer> matchedSyslogs = EventMatcher.matchSyslogEvents(cpnSyslogEvents, onmsSyslogEvents);
+            LOG.info("Matched {} syslog events.", matchedSyslogs.size());
+
+            LOG.info("Matching traps.");
+            Map<String, Integer> matchedTraps = EventMatcher.matchTrapEvents(cpnTrapEvents, onmsTrapEvents);
+            LOG.info("Matched {} trap events.", matchedTraps.size());
+        }
     }
 
     private List<NodeAndFacts> getNodesAndFacts() throws IOException {
         final List<NodeAndFacts> nodesAndFacts = new LinkedList<>();
-
-        // Don't consider authentication failure traps
-        List<QueryBuilder> cpnEventExcludes = Arrays.asList(termQuery("description.keyword", "SNMP authentication failure"));
 
         // Build the unique set of hostnames by scrolling through all locations and extracting
         // the hostname portion
@@ -209,7 +270,7 @@ public class TSAudit {
         final AtomicReference<Date> maxTimeRef = new AtomicReference<>(new Date(0));
 
         // Retrieve syslog records for the given host
-        esDataProvider.getSyslogRecordsInRange(start, end, syslogs -> {
+        esDataProvider.getSyslogRecordsInRange(start, end, Arrays.asList(matchPhraseQuery("location", nodeAndFacts.getCpnHostname())), cpnEventExcludes,  syslogs -> {
             for (EventRecord syslog : syslogs) {
                 // Skip clears
                 if (EventUtils.isClear(syslog)) {
@@ -239,7 +300,7 @@ public class TSAudit {
                 }
 
             }
-        }, matchPhraseQuery("location", nodeAndFacts.getCpnHostname()));
+        });
 
 
         NodeAndFacts.ClockSkewStatus clockSkewStatus = NodeAndFacts.ClockSkewStatus.INDETERMINATE;

@@ -39,6 +39,7 @@ import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -150,28 +151,22 @@ public class EventClient {
     }
 
     public List<ESEventDTO> getTrapEvents(long startMs, long endMs, String hostname, String trapTypeOid) throws IOException {
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(boolQuery()
-                .must(prefixQuery("nodelabel", hostname))
-                .must(nestedQuery("p_oids", termQuery("p_oids.value",trapTypeOid), ScoreMode.None))
-                .must(rangeQuery("@timestamp").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
-        String query = searchSourceBuilder.toString();
-        final Search search = new Search.Builder(query)
-                .addIndex(esClusterConfiguration.getOpennmsEventIndex())
-                .addSort(new Sort("@timestamp"))
-                .setParameter(Parameters.SCROLL, "5m")
-                .build();
-
-        final List<ESEventDTO> matchedEvents = new ArrayList<>();
-        scroll(search, ESEventDTO.class, matchedEvents::addAll);
-        return matchedEvents;
+        return getTrapEvents(startMs, endMs, Arrays.asList(
+                prefixQuery("nodelabel", hostname),
+                nestedQuery("p_oids", termQuery("p_oids.value",trapTypeOid), ScoreMode.None)
+        ));
     }
-    
-    public List<ESEventDTO> getTrapEvents(long startMs, long endMs) throws IOException {
+
+    public List<ESEventDTO> getTrapEvents(long startMs, long endMs, List<QueryBuilder> includeQueries) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(QueryBuilders.boolQuery()
+        BoolQueryBuilder boolQuery = boolQuery()
                 .must(nestedQuery("p_oids", boolQuery().must(existsQuery("p_oids")), ScoreMode.None))
-                .must(rangeQuery("@timestamp").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
+                .must(rangeQuery("@timestamp").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis"));
+        // Add includes
+        for (QueryBuilder includeQuery : includeQueries) {
+            boolQuery.must(includeQuery);
+        }
+        searchSourceBuilder.query(boolQuery);
         String query = searchSourceBuilder.toString();
         final Search search = new Search.Builder(query)
                 .addIndex(esClusterConfiguration.getOpennmsEventIndex())
@@ -185,49 +180,29 @@ public class EventClient {
     }
 
     public List<ESEventDTO> getSyslogEvents(long startMs, long endMs, String hostname, String group) throws IOException {
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        final BoolQueryBuilder boolQuery = new BoolQueryBuilder();
-        boolQuery.must(matchQuery("eventsource", "syslogd"));
-        searchSourceBuilder.query(boolQuery);
-        final RangeQueryBuilder rangeQueryBuilder = new RangeQueryBuilder("@timestamp")
-                .gte(startMs)
-                .lte(endMs)
-                .includeLower(true)
-                .includeUpper(true)
-                .format("epoch_millis");
-        searchSourceBuilder.query(rangeQueryBuilder);
-        final Search search = new Search.Builder(searchSourceBuilder.toString())
-                .addIndex(esClusterConfiguration.getOpennmsEventIndex())
-                .addSort(new Sort("@timestamp"))
-                .setParameter(Parameters.SCROLL, "5m")
-                .build();
-
-        final List<ESEventDTO> matchedEvents = new ArrayList<>();
-        scroll(search, ESEventDTO.class, events -> {
-            for (ESEventDTO event : events) {
-                if (event.getNodeLabel() == null || !event.getNodeLabel().contains(hostname)) {
-                    continue;
-                }
-                if (event.getSyslogMessage() != null && event.getSyslogMessage().contains(group)) {
-                    matchedEvents.add(event);
-                }
-            }
-        });
-        return matchedEvents;
+        return getSyslogEvents(startMs, endMs, Collections.emptyList()).stream()
+                .filter(event -> { // FIXME: Should be done in query instead
+                    if (event.getNodeLabel() == null || !event.getNodeLabel().contains(hostname)) {
+                        return false;
+                    }
+                    if (event.getSyslogMessage() != null && event.getSyslogMessage().contains(group)) {
+                        return true;
+                    }
+                    return false;
+                })
+                .collect(Collectors.toList());
     }
 
-    public List<ESEventDTO> getSyslogEvents(long startMs, long endMs) throws IOException {
+    public List<ESEventDTO> getSyslogEvents(long startMs, long endMs, List<QueryBuilder> includeQueries) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         final BoolQueryBuilder boolQuery = new BoolQueryBuilder();
         boolQuery.must(matchQuery("eventsource", "syslogd"));
+        boolQuery.must(rangeQuery("@timestamp").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis"));
+        // Add includes
+        for (QueryBuilder includeQuery : includeQueries) {
+            boolQuery.must(includeQuery);
+        }
         searchSourceBuilder.query(boolQuery);
-        final RangeQueryBuilder rangeQueryBuilder = new RangeQueryBuilder("@timestamp")
-                .gte(startMs)
-                .lte(endMs)
-                .includeLower(true)
-                .includeUpper(true)
-                .format("epoch_millis");
-        searchSourceBuilder.query(rangeQueryBuilder);
         final Search search = new Search.Builder(searchSourceBuilder.toString())
                 .addIndex(esClusterConfiguration.getOpennmsEventIndex())
                 .addSort(new Sort("@timestamp"))
