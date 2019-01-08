@@ -1,21 +1,44 @@
 package org.opennms.oce.tools.onms.bucket;
 
-import java.util.Set;
+import java.util.Date;
+import java.util.List;
 
 import org.opennms.oce.tools.cpn.model.TicketRecord;
 
 public class Ticket {
 
-    private String id;
-    Set<CpnSyslog> syslogs;
-    Set<CpnTrap> traps;
+    private final String id;
+    private final Date creationTime;
+    private final int eventCount;
 
-    public Ticket(String id) {
-        this.id = id;
-    }
+    List<CpnSyslog> syslogs;
+
+    List<CpnTrap> traps;
 
     public Ticket(TicketRecord record) {
-        // TODO Auto-generated constructor stub
+        id = record.getTicketId();
+        creationTime = record.getCreationTime();
+        eventCount = record.getEventCount();
+    }
+
+    public Date getCreationTime() {
+        return creationTime;
+    }
+
+    public int getEventCount() {
+        return eventCount;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public List<CpnSyslog> getSyslogs() {
+        return syslogs;
+    }
+
+    public List<CpnTrap> getTraps() {
+        return traps;
     }
 
     public boolean matches(Situation s) {
@@ -34,24 +57,17 @@ public class Ticket {
                 traps.stream().anyMatch(trap -> trap.matchesAny(s.getTraps()));
     }
 
-    public Set<CpnSyslog> getSyslogs() {
-        return syslogs;
-    }
-
-    public void setSyslogs(Set<CpnSyslog> syslogs) {
+    public void setSyslogs(List<CpnSyslog> syslogs) {
         this.syslogs = syslogs;
     }
 
-    public Set<CpnTrap> getTraps() {
-        return traps;
-    }
-
-    public void setTraps(Set<CpnTrap> traps) {
+    public void setTraps(List<CpnTrap> traps) {
         this.traps = traps;
     }
 
     @Override
     public String toString() {
-        return "Ticket[" + id + syslogs + traps + "]";
+        return "Ticket[" + id + "]:\n" + syslogs + "\n" + traps;
     }
+
 }

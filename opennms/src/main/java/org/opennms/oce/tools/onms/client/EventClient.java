@@ -31,11 +31,11 @@ package org.opennms.oce.tools.onms.client;
 import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
 import static org.elasticsearch.index.query.QueryBuilders.existsQuery;
 import static org.elasticsearch.index.query.QueryBuilders.matchQuery;
+import static org.elasticsearch.index.query.QueryBuilders.matchPhraseQuery;
 import static org.elasticsearch.index.query.QueryBuilders.nestedQuery;
 import static org.elasticsearch.index.query.QueryBuilders.prefixQuery;
 import static org.elasticsearch.index.query.QueryBuilders.rangeQuery;
 import static org.elasticsearch.index.query.QueryBuilders.termQuery;
-import static org.elasticsearch.index.query.QueryBuilders.termsQuery;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -217,31 +217,22 @@ public class EventClient {
         return matchedEvents.stream().findFirst();
     }
 
-    public List<ESEventDTO> getSituationsForHostname(long startMs, long endMs, String hostname) throws IOException {
+    public List<AlarmDocumentDTO> getSituationsForHostname(long startMs, long endMs, String hostname) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.sort("@timestamp", SortOrder.ASC);
         searchSourceBuilder.query(QueryBuilders.boolQuery()
-                .must(prefixQuery("situation", "true"))
-                .must(prefixQuery("nodelabel", hostname))
-                .must(rangeQuery("@timestamp").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
+                .must(termQuery("situation", "true"))
+                .must(matchPhraseQuery("node.label", hostname))
+                .must(rangeQuery("@update_time").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
         final Search search = new Search.Builder(searchSourceBuilder.toString())
-                .addIndex(esClusterConfiguration.getOpennmsEventIndex())
-                .addSort(new Sort("@timestamp"))
                 .setParameter(Parameters.SCROLL, "5m")
                 .build();
 
-        final List<ESEventDTO> matchedEvents = new ArrayList<>();
-        scroll(search, ESEventDTO.class, matchedEvents::addAll);
-        return matchedEvents;
+        final List<AlarmDocumentDTO> situations = new ArrayList<>();
+        scroll(search, AlarmDocumentDTO.class, situations::addAll);
+        return situations;
     }
 
-    public List<ESEventDTO> getEventsForSituation(int situationId) throws IOException {
-        Optional<AlarmDocumentDTO> situation = findAlarmForEventWithId(situationId);
-        if (!situation.isPresent()) {
-            return Collections.emptyList();
-        }
-        List<String> relatedReductionKeys = situation.get().getRelatedAlarmReductionKeys();
-
+    public List<ESEventDTO> getEventsForReductionKeys(List<String> relatedReductionKeys) throws IOException {
         if (relatedReductionKeys == null || relatedReductionKeys.isEmpty()) {
             return Collections.emptyList();
         }

@@ -1,9 +1,12 @@
 package org.opennms.oce.tools.onms.bucket;
 
 import java.io.IOException;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -13,7 +16,14 @@ import java.util.stream.Collectors;
 
 import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.cpn.model.TicketRecord;
+import org.opennms.oce.tools.es.ESClient;
+import org.opennms.oce.tools.es.ESClusterConfiguration;
+import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
+import org.opennms.oce.tools.onms.client.ESEventDTO;
+import org.opennms.oce.tools.onms.client.EventClient;
 import org.opennms.oce.tools.tsaudit.NodeAndFacts;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 //
 // Bucket of tickets/situations
@@ -22,6 +32,8 @@ import org.opennms.oce.tools.tsaudit.NodeAndFacts;
 // List of situations (attached to Nodes)
 // Output: buckets with meta-data
 public class Buckets {
+
+    private static final Logger LOG = LoggerFactory.getLogger(Buckets.class);
 
     private List<Match> matches = new ArrayList<>();
     private List<Match> partialMatches = new ArrayList<>();
@@ -32,6 +44,37 @@ public class Buckets {
 
     public Buckets(ESDataProvider esDataProvider) {
         this.esDataProvider = Objects.requireNonNull(esDataProvider);
+    }
+
+    EventClient eventClient;
+
+    // TODO - delete main method when done.
+    public static void main(String[] args) {
+        ESClusterConfiguration clusterConfiguration = new ESClusterConfiguration();
+        clusterConfiguration.setName("es");
+        clusterConfiguration.setConnTimeout(30000);
+        clusterConfiguration.setUrl(System.getProperty("url"));
+        clusterConfiguration.setReadTimeout(120000);
+        clusterConfiguration.setOpennmsEventIndex(System.getProperty("event-index"));
+
+        ESClient esClient = new ESClient(clusterConfiguration);
+        ESDataProvider esDataProvider = new ESDataProvider(esClient);
+        Buckets b = new Buckets(esDataProvider);
+        NodeAndFacts node = new NodeAndFacts(System.getProperty("hostname"));
+        node.setOpennmsNodeLabel(System.getProperty("host.fqdn"));
+        node.setOpennmsNodeId(975);
+
+        b.eventClient = new EventClient(esClient);
+
+        List<NodeAndFacts> nodes = Arrays.asList(node);
+        ZonedDateTime start = ZonedDateTime.of(2019, 1, 6, 18, 0, 0, 0, ZoneId.systemDefault());
+        ZonedDateTime end = ZonedDateTime.of(2019, 1, 6, 23, 59, 59, 999, ZoneId.systemDefault());
+        try {
+            b.run(nodes, start, end);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     public void run(List<NodeAndFacts> nodes, ZonedDateTime start, ZonedDateTime end) throws IOException {
@@ -51,7 +94,7 @@ public class Buckets {
         for (Node n : filteredNodes) {
             n.setOnmsData(getOnmsData(n));
         }
-        parseNodes(filteredNodes);
+        parseNodes(filteredNodes, start, end);
     }
 
     private void addTicketToNode(TicketRecord record) {
@@ -70,13 +113,22 @@ public class Buckets {
         return location;
     }
 
-    private void parseNodes(Collection<Node> nodes) {
+    private void parseNodes(Collection<Node> nodes, ZonedDateTime start, ZonedDateTime end) {
         // TODO - sort chrono Tickets and Situations
         // TODO - only search a small sliding window of time
         // TODO - remove matched situations from SituationSet
         for (Node node : nodes) {
-            Set<Situation> situations = node.getSituations();
+            // Populate the Situations we will consider
+            List<Situation> situations = getSituations(node, start, end);
             for (Ticket t : node.getTickets()) {
+                LOG.debug("Attempting to match TICKET {}", t.getId());
+                try {
+                    t.setTraps(getTicketTraps(t));
+                    t.setSyslogs(getTicketSyslogs(t));
+                } catch (IOException e) {
+                    LOG.warn("Failed to retrieve event for TICKET {} : {}", t.getId(), e.getMessage());
+                    continue;
+                }
                 boolean ticketIsUnmatched = true;
                 //
                 for (Situation s : situations) {
@@ -97,13 +149,48 @@ public class Buckets {
             }
         }
 
-        System.out.printf("There were %d matches out of %d tickets", matches.size(), nodes.stream().map(Node::getTickets).count());
+        System.out.printf("There were %d matches out of %d tickets:\n\n", matches.size(), nodes.stream().map(Node::getTickets).mapToInt(Set::size).sum());
 
-        System.out.printf("There were %d partial matches", partialMatches.size());
+        System.out.printf("There were %d partial matches:\n\n", partialMatches.size());
         partialMatches.forEach(Buckets::printPartialMatch);
 
-        System.out.printf("There were %d tickets that were not matched", unmatchedTickets.size());
+        System.out.printf("There were %d tickets that were not matched:\n\n", unmatchedTickets.size());
         unmatchedTickets.forEach(Buckets::printUnmatchedTicket);
+    }
+
+    private List<Situation> getSituations(Node node, ZonedDateTime start, ZonedDateTime end) {
+        List<Situation> situations = new ArrayList<>();
+        List<AlarmDocumentDTO> dtos;
+        try {
+            dtos = eventClient.getSituationsForHostname(start.toInstant().toEpochMilli(), end.toInstant().toEpochMilli(), node.getOnmsNodeLabel());
+        } catch (IOException e) {
+            LOG.warn("Error retrieving situations for Node {} on range {} to {} : {}", node.getOnmsNodeLabel(), start, end, e.getMessage());
+            return Collections.emptyList();
+        }
+        for (AlarmDocumentDTO dto : dtos) {
+            Situation s = new Situation(dto);
+            List<ESEventDTO> events = getSyslogsForSituation(dto.getRelatedAlarmReductionKeys());
+            s.setEvents(events);
+            situations.add(s);
+        }
+        return situations;
+    }
+
+    private List<ESEventDTO> getSyslogsForSituation(List<String> relatedReductionKeys) {
+        try {
+            return eventClient.getEventsForReductionKeys(relatedReductionKeys);
+        } catch (IOException e) {
+            LOG.warn("Failed to retrieve events for Situation {} : {}", relatedReductionKeys, e.getMessage());
+        }
+        return Collections.emptyList();
+    }
+
+    private List<CpnSyslog> getTicketSyslogs(Ticket t) throws IOException {
+        return esDataProvider.getSyslogsInTicket(t.getId()).stream().map(syslog -> new CpnSyslog(syslog)).collect(Collectors.toList());
+    }
+
+    private List<CpnTrap> getTicketTraps(Ticket t) throws IOException {
+        return esDataProvider.getTrapsInTicket(t.getId()).stream().map(trap -> new CpnTrap(trap)).collect(Collectors.toList());
     }
 
     private static void printPartialMatch(Match m) {
@@ -126,7 +213,7 @@ public class Buckets {
     }
 
     private Collection<Node> filter(Collection<Node> nodes) {
-        // FIXME - Do filtering
+        // TODO - Do filtering
         // TODO - report out data that is filtered.
         /*
          * Filtering: Filter services from tickets, 

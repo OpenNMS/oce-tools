@@ -1,6 +1,8 @@
 package org.opennms.oce.tools.onms.bucket;
 
-import java.util.Set;
+import java.util.List;
+
+import org.opennms.oce.tools.cpn.model.EventRecord;
 
 public class CpnSyslog {
 
@@ -8,12 +10,18 @@ public class CpnSyslog {
 
     private long time;
 
+    public CpnSyslog(EventRecord r) {
+        detailedDescription = r.getDetailedDescription();
+        // FIXME - set time by parsing detailDescription.....
+        time = r.getTime().getTime();
+
+    }
     public boolean matches(OnmsSyslog s) {
         // FIXME
         return false;
     }
 
-    public boolean matchesAny(Set<OnmsSyslog> syslogs) {
+    public boolean matchesAny(List<OnmsSyslog> syslogs) {
         return syslogs.stream().anyMatch(s -> matches(s));
     }
 

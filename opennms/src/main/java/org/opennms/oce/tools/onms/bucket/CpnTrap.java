@@ -1,6 +1,8 @@
 package org.opennms.oce.tools.onms.bucket;
 
-import java.util.Set;
+import java.util.List;
+
+import org.opennms.oce.tools.cpn.model.TrapRecord;
 
 public class CpnTrap {
 
@@ -10,12 +12,18 @@ public class CpnTrap {
 
     private long time;
 
+    public CpnTrap(TrapRecord r) {
+        trapTypeOid = r.getTrapTypeOid();
+        location = r.getLocation();
+        time = r.getTime().getTime();
+    }
+
     public boolean matches(OnmsTrap t) {
         // FIXME
         return false;
     }
 
-    public boolean matchesAny(Set<OnmsTrap> traps) {
+    public boolean matchesAny(List<OnmsTrap> traps) {
         return traps.stream().anyMatch(t -> matches(t));
     }
 

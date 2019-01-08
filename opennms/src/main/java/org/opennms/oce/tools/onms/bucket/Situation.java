@@ -1,27 +1,43 @@
 package org.opennms.oce.tools.onms.bucket;
 
-import java.util.Set;
+import java.util.List;
+
+import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
+import org.opennms.oce.tools.onms.client.ESEventDTO;
 
 public class Situation {
 
-    private Set<OnmsSyslog> syslogs;
+    private Integer id;
 
-    private Set<OnmsTrap> traps;
+    private List<OnmsSyslog> syslogs;
 
-    public Set<OnmsSyslog> getSyslogs() {
+    private List<OnmsTrap> traps;
+
+    public Situation(AlarmDocumentDTO dto) {
+        id = dto.getId();
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public List<OnmsSyslog> getSyslogs() {
         return syslogs;
     }
 
-    public void setSyslogs(Set<OnmsSyslog> onmsSyslogs) {
+    public void setSyslogs(List<OnmsSyslog> onmsSyslogs) {
         this.syslogs = onmsSyslogs;
     }
 
-    public Set<OnmsTrap> getTraps() {
+    public List<OnmsTrap> getTraps() {
         return traps;
     }
 
-    public void setTraps(Set<OnmsTrap> onmsTtraps) {
+    public void setTraps(List<OnmsTrap> onmsTtraps) {
         this.traps = onmsTtraps;
     }
 
+    public void setEvents(List<ESEventDTO> events) {
+        // FIXME --- converft each event to syslog or trap and add to stack
+    }
 }
