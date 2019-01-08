@@ -72,11 +72,11 @@ public class TSAudit {
     private final ZonedDateTime end;
     private final long startMs;
     private final long endMs;
-    private final List<String> nodes;
+    private final List<String> hostnameSubstringsToFilter;
     private final StateCache stateCache;
     private final boolean csvOutput;
 
-    public TSAudit(ESDataProvider esDataProvider, EventClient eventClient, ZonedDateTime start, ZonedDateTime end, List<String> nodes, boolean csvOutput) {
+    public TSAudit(ESDataProvider esDataProvider, EventClient eventClient, ZonedDateTime start, ZonedDateTime end, List<String> hostnames, boolean csvOutput) {
         this.esDataProvider = Objects.requireNonNull(esDataProvider);
         this.eventClient = Objects.requireNonNull(eventClient);
 
@@ -85,7 +85,7 @@ public class TSAudit {
         this.startMs = start.toInstant().toEpochMilli();
         this.endMs = end.toInstant().toEpochMilli();
 
-        this.nodes = Objects.requireNonNull(nodes);
+        this.hostnameSubstringsToFilter = Objects.requireNonNull(hostnames);
         this.csvOutput = csvOutput;
 
         this.stateCache = new StateCache(startMs, endMs);
@@ -132,6 +132,20 @@ public class TSAudit {
 
         // Build the initial objects from the set of hostname
         for (String hostname : hostnames) {
+            // Apply the hostname filters (could be also done in the query above to improve performance)
+            if (hostnameSubstringsToFilter.size() > 0) {
+                boolean matched = false;
+                for (String hostnameSubstringToFilter : hostnameSubstringsToFilter) {
+                    if (hostname.toLowerCase().contains(hostnameSubstringToFilter.toLowerCase())) {
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    LOG.info("Skipping {}. Does not match given substrings.", hostname);
+                    continue;
+                }
+            }
             nodesAndFacts.add(new NodeAndFacts(hostname));
         }
 

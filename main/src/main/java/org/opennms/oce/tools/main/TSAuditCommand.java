@@ -47,8 +47,8 @@ public class TSAuditCommand extends AbstractCommand {
     @Option(name = "--to", aliases = {"-t"}, usage = "To date i.e. Oct 29 2018")
     private String to;
 
-    @Option(name = "--node", aliases = {"-n"}, usage = "Node labels")
-    private List<String> nodes = new LinkedList<>();
+    @Option(name = "--hostname", usage = "Only consider CPN hostnames that contain this substring")
+    private List<String> hostnames = new LinkedList<>();
 
     @Option(name = "--csv", usage = "Output the tables in CSV format instead of pretty printing")
     private boolean csvOutput = false;
@@ -65,7 +65,7 @@ public class TSAuditCommand extends AbstractCommand {
         EventClient eventClient = new EventClient(esClient);
 
         CommandUtils.DateRange range = CommandUtils.parseDateRange(from, to);
-        final TSAudit tsAudit = new TSAudit(esDataProvider, eventClient, range.getStart(), range.getEnd(), nodes, csvOutput);
+        final TSAudit tsAudit = new TSAudit(esDataProvider, eventClient, range.getStart(), range.getEnd(), hostnames, csvOutput);
         tsAudit.run();
     }
 }
