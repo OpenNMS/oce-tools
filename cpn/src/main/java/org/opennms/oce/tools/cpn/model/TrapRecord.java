@@ -33,9 +33,10 @@ import java.util.Objects;
 import org.apache.commons.csv.CSVRecord;
 import org.opennms.oce.tools.common.TrapEvent;
 import org.opennms.oce.tools.cpn.DateHandler;
+import org.opennms.oce.tools.cpn.events.MatchingTrapEventRecord;
 import org.snmp4j.smi.OID;
 
-public class TrapRecord extends EventRecord implements TrapEvent {
+public class TrapRecord extends EventRecord implements TrapEvent, MatchingTrapEventRecord {
     private final String trapType;
     private final String longDescription;
     private final String translatedEnterprise;
@@ -79,6 +80,7 @@ public class TrapRecord extends EventRecord implements TrapEvent {
         return enterprise;
     }
 
+    @Override
     public String getTrapTypeOid() {
         return trapTypeOid;
     }

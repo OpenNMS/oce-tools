@@ -31,7 +31,6 @@ package org.opennms.oce.tools.tsaudit;
 import java.nio.ByteBuffer;
 import java.time.DateTimeException;
 import java.time.ZonedDateTime;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -71,7 +70,7 @@ class SyslogParser {
                 zonedDateTimeBuilder.setSecond(syslogMessage.getSecond());
             }
             if (syslogMessage.getMillisecond() != null) {
-                zonedDateTimeBuilder.setNanosecond(syslogMessage.getMillisecond() * 1000);
+                zonedDateTimeBuilder.setNanosecond(syslogMessage.getMillisecond() * 1000000);
             }
             if (syslogMessage.getZoneId() != null) {
                 zonedDateTimeBuilder.setZoneId(syslogMessage.getZoneId());

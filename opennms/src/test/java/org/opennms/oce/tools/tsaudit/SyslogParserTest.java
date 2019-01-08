@@ -48,10 +48,17 @@ public class SyslogParserTest {
 
     @Test
     public void testParse() throws ExecutionException, InterruptedException, ParseException {
+        Date currentDate = new Date();
         // prepend the year since parser assumes current year
         Date expectedDate =
                 new SimpleDateFormat("yyyy MMM dd hh:mm:ss.SSS").parse(Calendar.getInstance().get(Calendar.YEAR) + " "
                         + dateString);
+        
+        // Hack to correct the year to previous year if the date without year happens after now
+        if(expectedDate.getTime() > currentDate.getTime()) {
+            expectedDate = new SimpleDateFormat("yyyy MMM dd hh:mm:ss.SSS").parse((Calendar.getInstance().get(Calendar.YEAR) - 1) + " "
+                    + dateString);
+        }
 
         SyslogMessage msg = SyslogParser.parse(syslogMessageString);
         assertEquals(expectedDate, msg.getDate());

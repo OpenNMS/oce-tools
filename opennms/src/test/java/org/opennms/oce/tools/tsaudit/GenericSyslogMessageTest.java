@@ -49,19 +49,27 @@ public class GenericSyslogMessageTest {
             "with Switch GigabitEthernet1/0/24 (1).";
     private static final String syslogMessageString = "<188>1421602: " + dateString + ": " + message;
     private static final String host = "testhost";
+    private static final Integer onmsId = 1;
 
     @Test
     public void testCompare() throws ExecutionException, InterruptedException, ParseException {
-        GenericSyslogMessage messageFromCpn = GenericSyslogMessage.fromCpn(host, syslogMessageString);
+        GenericSyslogMessage messageFromCpn = GenericSyslogMessage.fromCpn("id", host, syslogMessageString);
+        Date currentDate = new Date();
         // prepend the year since parser assumes current year
         Date expectedDate =
                 new SimpleDateFormat("yyyy MMM dd hh:mm:ss.SSS").parse(Calendar.getInstance().get(Calendar.YEAR) + " "
                         + dateString);
-        GenericSyslogMessage messageFromOnms = GenericSyslogMessage.fromOnms(host, message, expectedDate);
+
+        // Hack to correct the year to previous year if the date without year happens after now
+        if(expectedDate.getTime() > currentDate.getTime()) {
+            expectedDate = new SimpleDateFormat("yyyy MMM dd hh:mm:ss.SSS").parse((Calendar.getInstance().get(Calendar.YEAR) - 1) + " "
+                    + dateString);
+        }
+        GenericSyslogMessage messageFromOnms = GenericSyslogMessage.fromOnms(onmsId, host, message, expectedDate);
         assertThat(messageFromCpn, is(equalTo(messageFromOnms)));
         assertThat(messageFromCpn.anyMatch(Collections.singleton(messageFromOnms)), is(equalTo(true)));
 
-        messageFromOnms = GenericSyslogMessage.fromOnms("different", message, expectedDate);
+        messageFromOnms = GenericSyslogMessage.fromOnms(onmsId, "different", message, expectedDate);
         assertThat(messageFromCpn, not(equalTo(messageFromOnms)));
         assertThat(messageFromCpn.anyMatch(Collections.singleton(messageFromOnms)), is(equalTo(false)));
     }

@@ -35,10 +35,11 @@ import org.apache.commons.csv.CSVRecord;
 import org.apache.logging.log4j.util.Strings;
 import org.opennms.oce.tools.cpn.DateHandler;
 import org.opennms.oce.tools.cpn.events.EventRecordLite;
+import org.opennms.oce.tools.cpn.events.MatchingSyslogEventRecord;
 
 import io.searchbox.annotations.JestId;
 
-public class EventRecord implements EventRecordLite {
+public class EventRecord implements EventRecordLite, MatchingSyslogEventRecord {
     private final String source;
     private final EventSeverity severity;
     @JestId
@@ -81,6 +82,7 @@ public class EventRecord implements EventRecordLite {
         return severity;
     }
 
+    @Override
     public String getEventId() {
         return eventId;
     }
@@ -94,6 +96,7 @@ public class EventRecord implements EventRecordLite {
         return description;
     }
 
+    @Override
     public String getDetailedDescription() {
         return detailedDescription;
     }
