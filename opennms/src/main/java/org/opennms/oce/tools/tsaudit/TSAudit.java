@@ -221,7 +221,7 @@ public class TSAudit {
 
                 // Parse the syslog record and extract the date from the message
                 try {
-                    GenericSyslogMessage parsedSyslogMessage = GenericSyslogMessage.fromCpn(nodeAndFacts.getCpnHostname(), syslog.getDetailedDescription());
+                    GenericSyslogMessage parsedSyslogMessage = GenericSyslogMessage.fromCpn(syslog.getEventId(), nodeAndFacts.getCpnHostname(), syslog.getDetailedDescription());
                     messageTime = parsedSyslogMessage.getDate();
                 } catch (ExecutionException|InterruptedException e) {
                     throw new RuntimeException(e);

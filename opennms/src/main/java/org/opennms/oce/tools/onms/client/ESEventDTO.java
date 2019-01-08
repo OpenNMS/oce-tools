@@ -29,6 +29,9 @@
 package org.opennms.oce.tools.onms.client;
 
 import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import com.google.gson.annotations.SerializedName;
 
@@ -48,6 +51,9 @@ public class ESEventDTO {
 
     @SerializedName("id")
     private Integer id;
+    
+    @SerializedName("p_oids")
+    private List<Map<String, String>> p_oids;
 
     public String getNodeLabel() {
         return nodeLabel;
@@ -89,14 +95,36 @@ public class ESEventDTO {
         this.id = id;
     }
 
+    public List<Map<String, String>> getP_oids() {
+        return p_oids;
+    }
+
+    public void setP_oids(List<Map<String, String>> p_oids) {
+        this.p_oids = p_oids;
+    }
+    
+    public Optional<String> getTrapTypeOid() {
+        if(p_oids != null && !p_oids.isEmpty()) {
+            String trapTypeOid = ".1.3.6.1.6.3.1.1.4.3.0";
+            for (Map<String, String> oidKv : p_oids) {
+                if (oidKv.containsKey(trapTypeOid)) {
+                    return Optional.of(oidKv.get(trapTypeOid));
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
     @Override
     public String toString() {
         return "ESEventDTO{" +
                 "nodeLabel='" + nodeLabel + '\'' +
-                ", nodeId='" + nodeId + '\'' +
+                ", nodeId=" + nodeId +
                 ", syslogMessage='" + syslogMessage + '\'' +
                 ", timestamp=" + timestamp +
                 ", id=" + id +
+                ", p_oids=" + p_oids +
                 '}';
     }
 }

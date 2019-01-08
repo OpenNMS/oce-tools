@@ -36,37 +36,45 @@ import java.util.concurrent.ExecutionException;
 import org.opennms.netmgt.syslogd.SyslogMessage;
 
 public class GenericSyslogMessage {
+    private final String id;
     private final String host;
     private final String message;
     private final Date date;
 
-    private GenericSyslogMessage(String host, String detailedDescription) throws ExecutionException,
+    private GenericSyslogMessage(String id, String host, String detailedDescription) throws ExecutionException,
             InterruptedException {
+        this.id = id;
         this.host = host;
         SyslogMessage syslogMessage = SyslogParser.parse(detailedDescription);
         this.message = Objects.requireNonNull(syslogMessage.getMessage());
         this.date = Objects.requireNonNull(syslogMessage.getDate());
     }
 
-    private GenericSyslogMessage(String nodeLabel, String message, Date date) {
+    private GenericSyslogMessage(String id, String nodeLabel, String message, Date date) {
+        this.id = id;
         this.host = nodeLabel;
         this.message = message;
         this.date = date;
     }
 
-    public static GenericSyslogMessage fromCpn(String host, String detailedDescription) throws ExecutionException,
+    public static GenericSyslogMessage fromCpn(String id, String host, String detailedDescription) throws ExecutionException,
             InterruptedException {
-        return new GenericSyslogMessage(Objects.requireNonNull(host), Objects.requireNonNull(detailedDescription));
+        return new GenericSyslogMessage(Objects.requireNonNull(id), Objects.requireNonNull(host),
+                Objects.requireNonNull(detailedDescription));
     }
 
-    public static GenericSyslogMessage fromOnms(String host, String message, Date date) {
+    public static GenericSyslogMessage fromOnms(Integer id, String host, String message, Date date) {
         // Assumes the host passed in was already converted from a node label if applicable
-        return new GenericSyslogMessage(Objects.requireNonNull(host), Objects.requireNonNull(message),
-                Objects.requireNonNull(date));
+        return new GenericSyslogMessage(Objects.requireNonNull(id).toString(), Objects.requireNonNull(host),
+                Objects.requireNonNull(message), Objects.requireNonNull(date));
     }
-    
+
     public boolean anyMatch(Set<GenericSyslogMessage> syslogs) {
         return syslogs.stream().anyMatch(syslog -> syslog.equals(this));
+    }
+
+    public String getId() {
+        return id;
     }
 
     public String getHost() {
@@ -99,7 +107,8 @@ public class GenericSyslogMessage {
     @Override
     public String toString() {
         return "GenericSyslogMessage{" +
-                "host='" + host + '\'' +
+                "id='" + id + '\'' +
+                ", host='" + host + '\'' +
                 ", message='" + message + '\'' +
                 ", date=" + date +
                 '}';

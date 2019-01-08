@@ -31,7 +31,6 @@ package org.opennms.oce.tools.tsaudit;
 import java.nio.ByteBuffer;
 import java.time.DateTimeException;
 import java.time.ZonedDateTime;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;

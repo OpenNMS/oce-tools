@@ -166,6 +166,23 @@ public class EventClient {
         scroll(search, ESEventDTO.class, matchedEvents::addAll);
         return matchedEvents;
     }
+    
+    public List<ESEventDTO> getTrapEvents(long startMs, long endMs) throws IOException {
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(QueryBuilders.boolQuery()
+                .must(nestedQuery("p_oids", boolQuery().must(existsQuery("p_oids")), ScoreMode.None))
+                .must(rangeQuery("@timestamp").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
+        String query = searchSourceBuilder.toString();
+        final Search search = new Search.Builder(query)
+                .addIndex(esClusterConfiguration.getOpennmsEventIndex())
+                .addSort(new Sort("@timestamp"))
+                .setParameter(Parameters.SCROLL, "5m")
+                .build();
+
+        final List<ESEventDTO> matchedEvents = new ArrayList<>();
+        scroll(search, ESEventDTO.class, matchedEvents::addAll);
+        return matchedEvents;
+    }
 
     public List<ESEventDTO> getSyslogEvents(long startMs, long endMs, String hostname, String group) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
@@ -196,6 +213,29 @@ public class EventClient {
                 }
             }
         });
+        return matchedEvents;
+    }
+
+    public List<ESEventDTO> getSyslogEvents(long startMs, long endMs) throws IOException {
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        final BoolQueryBuilder boolQuery = new BoolQueryBuilder();
+        boolQuery.must(matchQuery("eventsource", "syslogd"));
+        searchSourceBuilder.query(boolQuery);
+        final RangeQueryBuilder rangeQueryBuilder = new RangeQueryBuilder("@timestamp")
+                .gte(startMs)
+                .lte(endMs)
+                .includeLower(true)
+                .includeUpper(true)
+                .format("epoch_millis");
+        searchSourceBuilder.query(rangeQueryBuilder);
+        final Search search = new Search.Builder(searchSourceBuilder.toString())
+                .addIndex(esClusterConfiguration.getOpennmsEventIndex())
+                .addSort(new Sort("@timestamp"))
+                .setParameter(Parameters.SCROLL, "5m")
+                .build();
+
+        final List<ESEventDTO> matchedEvents = new ArrayList<>();
+        scroll(search, ESEventDTO.class, matchedEvents::addAll);
         return matchedEvents;
     }
 
