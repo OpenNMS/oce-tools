@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,6 +23,7 @@ import org.opennms.oce.tools.es.ESClient;
 import org.opennms.oce.tools.es.ESClusterConfiguration;
 import org.opennms.oce.tools.es.ESConfigurationDao;
 import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
+import org.opennms.oce.tools.onms.alarmdto.EventDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
 import org.opennms.oce.tools.tsaudit.NodeAndFacts;
@@ -119,7 +121,7 @@ public class Buckets {
         // TODO - remove matched situations from SituationSet
         for (Node node : nodes) {
             // Populate the Situations we will consider
-            List<Situation> situations = getSituations(node, start, end);
+            Collection<Situation> situations = getSituations(node, start, end);
             for (Ticket t : node.getTickets()) {
                 LOG.debug("Attempting to match TICKET {}", t.getId());
                 try {
@@ -158,29 +160,50 @@ public class Buckets {
         unmatchedTickets.forEach(Buckets::printUnmatchedTicket);
     }
 
-    private List<Situation> getSituations(Node node, ZonedDateTime start, ZonedDateTime end) {
-        List<Situation> situations = new ArrayList<>();
-        List<AlarmDocumentDTO> dtos;
+    private Collection<Situation> getSituations(Node node, ZonedDateTime start, ZonedDateTime end) {
+        Map<Integer, Situation> situations = new HashMap<>();
+        List<AlarmDocumentDTO> situationDtos;
         try {
-            dtos = eventClient.getSituationsForHostname(start.toInstant().toEpochMilli(), end.toInstant().toEpochMilli(), node.getOnmsNodeLabel());
+            situationDtos = eventClient.getSituationsForHostname(start.toInstant().toEpochMilli(), end.toInstant().toEpochMilli(), node.getOnmsNodeLabel());
         } catch (IOException e) {
             LOG.warn("Error retrieving situations for Node {} on range {} to {} : {}", node.getOnmsNodeLabel(), start, end, e.getMessage());
             return Collections.emptyList();
         }
-        for (AlarmDocumentDTO dto : dtos) {
-            Situation s = new Situation(dto);
-            List<ESEventDTO> events = getSyslogsForSituation(dto.getRelatedAlarmReductionKeys());
-            s.setEvents(events);
-            situations.add(s);
+        // Reduce multiple documents to single Situations collecting all relatedReduction Keys and relatedAlarm Ids
+        for (AlarmDocumentDTO dto : situationDtos) {
+            situations.computeIfAbsent(dto.getId(), k -> new Situation(dto));
+            Situation s = situations.get(dto.getId());
+            s.addRelatedAlarmIds(dto.getRelatedAlarmIds());
+            s.addReductionKeys(dto.getRelatedAlarmReductionKeys());
         }
-        return situations;
+        // Retrieve Alarms for each situation
+        for (Situation s : situations.values()) {
+            List<AlarmDocumentDTO> alarmDtos;
+            try {
+                s.addRelatedAlarmDtos(eventClient.getAlarmsByIds(s.getRelatedAlarmIds().stream().collect(Collectors.toList())));
+            } catch (IOException e) {
+                LOG.warn("Error retrieving ALARMS for Situation {} : {} ", s, e.getMessage());
+                return Collections.emptyList();
+            }
+        }
+        // retrieve the related events and add them to the situations
+        for (Situation s : situations.values()) {
+            List<ESEventDTO> events = getEventsForAlarms(s.getRelatedAlarmDtos().stream()
+                                                             .map(AlarmDocumentDTO::getLastEvent)
+                                                             .filter(Objects::nonNull)
+                                                             .map(EventDocumentDTO::getId)
+                                                             .filter(Objects::nonNull)
+                                                             .collect(Collectors.toList()));
+            s.setEvents(events);
+        }
+        return situations.values();
     }
 
-    private List<ESEventDTO> getSyslogsForSituation(List<String> relatedReductionKeys) {
+    private List<ESEventDTO> getEventsForAlarms(List<Integer> eventIds) {
         try {
-            return eventClient.getEventsForReductionKeys(relatedReductionKeys);
+            return eventClient.getEventsByIds(eventIds);
         } catch (IOException e) {
-            LOG.warn("Failed to retrieve events for Situation {} : {}", relatedReductionKeys, e.getMessage());
+            LOG.warn("Failed to retrieve events for Event IDs {} : {}", eventIds, e.getMessage());
         }
         return Collections.emptyList();
     }

@@ -12,12 +12,11 @@ public class CpnSyslog {
 
     public CpnSyslog(EventRecord r) {
         detailedDescription = r.getDetailedDescription();
-        // FIXME - set time by parsing detailDescription.....
         time = r.getTime().getTime();
 
     }
     public boolean matches(OnmsSyslog s) {
-        // FIXME
+        // FIXME - from matching code
         return false;
     }
 

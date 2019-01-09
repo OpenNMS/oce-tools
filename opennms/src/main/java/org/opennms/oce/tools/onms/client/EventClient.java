@@ -247,16 +247,30 @@ public class EventClient {
         return situations;
     }
 
-    public List<ESEventDTO> getEventsForReductionKeys(List<String> relatedReductionKeys) throws IOException {
-        if (relatedReductionKeys == null || relatedReductionKeys.isEmpty()) {
+    public List<AlarmDocumentDTO> getAlarmsByIds(List<Integer> alarmIds) throws IOException {
+        if (alarmIds == null || alarmIds.isEmpty()) {
             return Collections.emptyList();
         }
 
-        String[] alarmReductionKeys = new String[relatedReductionKeys.size()];
-        relatedReductionKeys.toArray(alarmReductionKeys);
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        final TermsQueryBuilder termQuery = new TermsQueryBuilder("id", alarmIds.stream().mapToInt(i -> i).toArray());
+        searchSourceBuilder.query(termQuery);
+        final Search search = new Search.Builder(searchSourceBuilder.toString())
+                .setParameter(Parameters.SCROLL, "5m")
+                .build();
+
+        final List<AlarmDocumentDTO> alarms = new ArrayList<>();
+        scroll(search, AlarmDocumentDTO.class, alarms::addAll);
+        return alarms;
+    }
+
+    public List<ESEventDTO> getEventsByIds(List<Integer> eventIds) throws IOException {
+        if (eventIds == null || eventIds.isEmpty()) {
+            return Collections.emptyList();
+        }
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        final TermsQueryBuilder termQuery = new TermsQueryBuilder("alarmreductionkey", alarmReductionKeys);
+        final TermsQueryBuilder termQuery = new TermsQueryBuilder("id", eventIds.stream().mapToInt(i -> i).toArray());
         searchSourceBuilder.query(termQuery);
         final Search search = new Search.Builder(searchSourceBuilder.toString())
                 .addIndex(esClusterConfiguration.getOpennmsEventIndex())
