@@ -28,9 +28,7 @@
 
 package org.opennms.oce.tools.cpn;
 
-import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
 import static org.elasticsearch.index.query.QueryBuilders.matchPhraseQuery;
-import static org.elasticsearch.index.query.QueryBuilders.prefixQuery;
 import static org.elasticsearch.index.query.QueryBuilders.rangeQuery;
 import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 
@@ -48,12 +46,9 @@ import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
-import org.elasticsearch.index.search.MultiMatchQuery;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
-import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
-import org.elasticsearch.search.sort.SortOrder;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.TicketRecord;
 import org.opennms.oce.tools.cpn.model.TrapRecord;
@@ -87,12 +82,26 @@ public class ESDataProvider {
     }
 
     public void getTicketRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, Consumer<List<TicketRecord>> callback) throws IOException {
+        getTicketRecordsInRange(startTime, endTime, Collections.emptyList(), Collections.emptyList(), callback);
+    }
+
+    public void getTicketRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, List<QueryBuilder> includeQueries, List<QueryBuilder> excludeQueries, Consumer<List<TicketRecord>> callback) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        final BoolQueryBuilder boolQuery = new BoolQueryBuilder();
         final RangeQueryBuilder rangeQueryBuilder = new RangeQueryBuilder("rootEventTime")
                 .gte(startTime.toEpochSecond())
                 .lt(endTime.toEpochSecond())
                 .format("epoch_second");
-        searchSourceBuilder.query(rangeQueryBuilder);
+        boolQuery.must(rangeQueryBuilder);
+        // Add includes
+        for (QueryBuilder includeQuery : includeQueries) {
+            boolQuery.must(includeQuery);
+        }
+        // Add excludes
+        for (QueryBuilder excludeQuery : excludeQueries) {
+            boolQuery.mustNot(excludeQuery);
+        }
+        searchSourceBuilder.query(boolQuery);
         searchSourceBuilder.size(BATCH_SIZE);
         getTicketRecords(searchSourceBuilder.toString(), callback);
     }

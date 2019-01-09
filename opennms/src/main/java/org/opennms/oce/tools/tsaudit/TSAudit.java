@@ -28,6 +28,7 @@
 
 package org.opennms.oce.tools.tsaudit;
 
+import static java.util.stream.Collectors.groupingBy;
 import static org.elasticsearch.index.query.QueryBuilders.matchPhraseQuery;
 import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 
@@ -42,6 +43,7 @@ import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.LongSummaryStatistics;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -57,11 +59,12 @@ import org.apache.commons.csv.CSVPrinter;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.cpn.EventUtils;
-import org.opennms.oce.tools.cpn.events.EventRecordLite;
 import org.opennms.oce.tools.cpn.events.MatchingSyslogEventRecord;
 import org.opennms.oce.tools.cpn.events.MatchingTrapEventRecord;
 import org.opennms.oce.tools.cpn.model.EventRecord;
+import org.opennms.oce.tools.cpn.model.TicketRecord;
 import org.opennms.oce.tools.cpn.model.TrapRecord;
+import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
 import org.slf4j.Logger;
@@ -122,64 +125,214 @@ public class TSAudit {
                 .filter(NodeAndFacts::shouldProcess)
                 .collect(Collectors.toList());
 
-        // Gather all the events of interest for the nodes we want to process
-        retrieveAndPairEvents(nodesToProcess);
+        for (NodeAndFacts nodeAndFacts : nodesToProcess) {
+            // Gather all the events of interest for the node we want to process
+            final NodeAndEvents nodeAndEvents = retrieveAndPairEvents(nodeAndFacts);
 
-        // TODO: Evaluate the situations
+            // Print the matches
+            printEventMatches(nodeAndEvents.getMatchedTraps(), nodeAndEvents.getCpnTrapEvents(), nodeAndEvents.getOnmsTrapEvents());
+            printEventMatches(nodeAndEvents.getMatchedSyslogs(), nodeAndEvents.getCpnSyslogEvents(), nodeAndEvents.getOnmsSyslogEvents());
+
+            // Gather the tickets for the node
+            final List<TicketAndEvents> ticketsAndEvents = getTicketsAndPairEvents(nodeAndEvents);
+
+            // Gather the situations for the node
+            final List<SituationAndEvents> situationsAndEvents = getSituationsAndPairEvents(nodeAndEvents);
+
+            // Match
+            match(nodeAndEvents, ticketsAndEvents, situationsAndEvents);
+
+            // TODO: Further matching, and reporting
+        }
     }
 
-    private void retrieveAndPairEvents(List<NodeAndFacts> nodesAndFacts) throws IOException, ExecutionException, InterruptedException {
-        for (NodeAndFacts nodeAndFacts : nodesAndFacts) {
-            final List<MatchingSyslogEventRecord> cpnSyslogEvents = new ArrayList<>();
-            final List<MatchingTrapEventRecord> cpnTrapEvents = new ArrayList<>();
-            final List<ESEventDTO> onmsTrapEvents = new ArrayList<>();
-            final List<ESEventDTO> onmsSyslogEvents = new ArrayList<>();
+    private void match(NodeAndEvents nodeAndEvents, List<TicketAndEvents> ticketsAndEvents, List<SituationAndEvents> situationsAndEvents) {
+        final Map<String, Integer> matchedEvents = nodeAndEvents.getMatchedEvents();
 
-            // Retrieve syslog records for the given host
-            LOG.debug("Retrieving CPN syslog records for: {}", nodeAndFacts.getCpnHostname());
-            esDataProvider.getSyslogRecordsInRange(start, end, Arrays.asList(matchPhraseQuery("location", nodeAndFacts.getCpnHostname())), cpnEventExcludes,  syslogs -> {
-                for (EventRecord syslog : syslogs) {
-                    // Skip clears
-                    if (EventUtils.isClear(syslog)) {
-                        continue;
-                    }
-                    cpnSyslogEvents.add(syslog);
+        // Convert to canonical situations for easy comparision
+        List<CanonicalSituation> cpnCanonicalSituations = ticketsAndEvents.stream()
+                .map(t -> new CanonicalSituation(t, matchedEvents))
+                .collect(Collectors.toList());
+
+        List<CanonicalSituation> onmsCanonicalSituations = situationsAndEvents.stream()
+                .map(CanonicalSituation::new)
+                .collect(Collectors.toList());
+
+        // Now try to find exact matches
+        for (CanonicalSituation cpnCanonicalSituation : cpnCanonicalSituations) {
+            for (CanonicalSituation onmsCanonicalSituation : onmsCanonicalSituations) {
+                if (cpnCanonicalSituation.equals(onmsCanonicalSituation)) {
+                    System.out.printf("Found exact match on CPN ticket id: %s to OpenNMS situation id: %s\n",
+                            cpnCanonicalSituation.getSourceId(),
+                            onmsCanonicalSituation.getSourceId());
+                } else if (onmsCanonicalSituation.contains(cpnCanonicalSituation)) {
+                    System.out.printf("Found partial match (CPN ticket in ONMS situation) on CPN ticket id: %s to OpenNMS situation id: %s\n",
+                            cpnCanonicalSituation.getSourceId(),
+                            onmsCanonicalSituation.getSourceId());
+                } else if (cpnCanonicalSituation.contains(onmsCanonicalSituation)) {
+                    System.out.printf("Found partial match (ONMS situation in CPN ticket) on CPN ticket id: %s to OpenNMS situation id: %s\n",
+                            cpnCanonicalSituation.getSourceId(),
+                            onmsCanonicalSituation.getSourceId());
                 }
-            });
-
-            // Retrieve trap records for the given host
-            LOG.debug("Retrieving CPN trap records for: {}", nodeAndFacts.getCpnHostname());
-            esDataProvider.getTrapRecordsInRange(start, end, Arrays.asList(matchPhraseQuery("location", nodeAndFacts.getCpnHostname())), cpnEventExcludes,  traps -> {
-                for (TrapRecord trap : traps) {
-                    // Skip clears
-                    if (EventUtils.isClear(trap)) {
-                        continue;
-                    }
-                    cpnTrapEvents.add(trap);
-                }
-            });
-
-            // Retrieve the ONMS trap events
-            LOG.debug("Retrieving ONMS trap events for: {}", nodeAndFacts.getOpennmsNodeLabel());
-            onmsTrapEvents.addAll(eventClient.getTrapEvents(startMs, endMs, Arrays.asList(termQuery("nodeid", nodeAndFacts.getOpennmsNodeId()))));
-
-            // Retrieve the ONMS syslog events
-            LOG.debug("Retrieving ONMS syslog events for: {}", nodeAndFacts.getOpennmsNodeLabel());
-            onmsSyslogEvents.addAll(eventClient.getSyslogEvents(startMs, endMs, Arrays.asList(termQuery("nodeid", nodeAndFacts.getOpennmsNodeId()))));
-            LOG.debug("Done retrieving events for host. Found {} CPN syslogs, {} CPN traps, {} ONMS syslogs and {} ONMS traps.",
-                    cpnSyslogEvents.size(), cpnTrapEvents.size(), onmsSyslogEvents.size(), onmsTrapEvents.size());
-
-            // Perform the matching
-            LOG.info("Matching syslogs...");
-            Map<String, Integer> matchedSyslogs = EventMatcher.matchSyslogEventsScopedByTimeAndHost(cpnSyslogEvents, onmsSyslogEvents);
-            LOG.info("Matched {} syslog events.", matchedSyslogs.size());
-            printEventMatches(matchedSyslogs, cpnSyslogEvents, onmsSyslogEvents);
-
-            LOG.info("Matching traps.");
-            Map<String, Integer> matchedTraps = EventMatcher.matchTrapEventsScopedByTimeAndHost(cpnTrapEvents, onmsTrapEvents);
-            LOG.debug("Matched {} trap events.", matchedTraps.size());
-            printEventMatches(matchedTraps, cpnTrapEvents, onmsTrapEvents);
+            }
         }
+
+        // TODO: Better matching and partial matching
+    }
+
+    private List<TicketAndEvents> getTicketsAndPairEvents(NodeAndEvents nodeAndEvents) throws IOException {
+        // Retrieve the tickets
+        final List<TicketRecord> ticketsOnNode = new LinkedList<>();
+        esDataProvider.getTicketRecordsInRange(start, end,
+                Arrays.asList(
+                        matchPhraseQuery("location", nodeAndEvents.getNodeAndFacts().getCpnHostname()), // must be for the node in question
+                        termQuery("affectedDevicesCount", 1) // must only affect a single device (this node)
+                ),
+                Collections.emptyList(),
+                ticketsOnNode::addAll);
+        LOG.debug("Found {} tickets.", ticketsOnNode.size());
+
+        // Match the events up with the tickets
+        final List<TicketAndEvents> ticketsAndEvents = new LinkedList<>();
+        for (TicketRecord ticket : ticketsOnNode) {
+            final List<EventRecord> eventsInTicket = nodeAndEvents.getCpnEvents().stream()
+                    .filter(e -> ticket.getTicketId().equals(e.getTicketId()))
+                    .collect(Collectors.toList());
+
+            if (eventsInTicket.isEmpty()) {
+                LOG.warn("No events found for ticket: {}", ticket.getTicketId());
+                continue;
+            }
+
+            final TicketAndEvents ticketAndEvents = new TicketAndEvents(ticket, eventsInTicket);
+            ticketsAndEvents.add(ticketAndEvents);
+        }
+        return ticketsAndEvents;
+    }
+
+    private List<SituationAndEvents> getSituationsAndPairEvents(NodeAndEvents nodeAndEvents) throws IOException {
+        // Retrieve the situations and alarms
+        final int nodeId = nodeAndEvents.getNodeAndFacts().getOpennmsNodeId();
+        final List<AlarmDocumentDTO> allSituationDtos = eventClient.getSituationsOnNodeId(startMs, endMs, nodeId);
+        final List<AlarmDocumentDTO> alarmDtos = eventClient.getAlarmsInSituationsOnNodeId(startMs, endMs, nodeId);
+
+        // Group the situations by id
+        final Map<Integer, List<AlarmDocumentDTO>> situationsById = allSituationDtos.stream()
+                .collect(groupingBy(AlarmDocumentDTO::getId));
+
+        // Group the alarms by reduction key
+        final Map<String, List<AlarmDocumentDTO>> alarmsByReductionKey = alarmDtos.stream()
+                .collect(groupingBy(AlarmDocumentDTO::getReductionKey));
+
+        // Group the events by reduction key
+        final Map<String, List<ESEventDTO>> eventsByReductionKey = nodeAndEvents.getOnmsEvents().stream()
+                .filter(e -> e.getAlarmReductionKey() != null)
+                .collect(groupingBy(ESEventDTO::getAlarmReductionKey));
+        // Group the events by clear key
+        final Map<String, List<ESEventDTO>> eventsByClearKey = nodeAndEvents.getOnmsEvents().stream()
+                .filter(e -> e.getAlarmClearKey() != null)
+                .collect(groupingBy(ESEventDTO::getAlarmClearKey));
+
+        // Process each situation
+        final List<SituationAndEvents> situationsAndEvents = new LinkedList<>();
+        for (List<AlarmDocumentDTO> situationDtos : situationsById.values()) {
+            // Gather all of the related reduction keys
+            final Set<String> relatedReductionKeys = situationDtos.stream()
+                    .flatMap(s -> s.getRelatedAlarmReductionKeys().stream())
+                    .collect(Collectors.toSet());
+
+            // Gather the events in the related alarms
+            final List<ESEventDTO> allEventsInSituation = new LinkedList<>();
+            for (String relatedReductionKey : relatedReductionKeys) {
+                // For every related alarm, determine it's lifespan
+                final List<AlarmDocumentDTO> relatedAlarmDtos = alarmsByReductionKey.getOrDefault(relatedReductionKey, Collections.emptyList());
+                if (relatedAlarmDtos.isEmpty()) {
+                    // No events to gather here
+                    continue;
+                }
+
+                final Lifespan alarmLifespan = getLifespan(relatedAlarmDtos);
+
+                // Now find events that relate to this reduction key in the given timespan
+                final List<ESEventDTO> eventsInAlarm = new LinkedList<>();
+                eventsByReductionKey.getOrDefault(relatedReductionKey, Collections.emptyList()).stream()
+                        .filter(e -> e.getTimestamp().getTime() >= alarmLifespan.getStartMs() && e.getTimestamp().getTime() <= alarmLifespan.getEndMs())
+                        .forEach(eventsInAlarm::add);
+
+                // Now find events that relate to this clear key in the given timespan
+                eventsByClearKey.getOrDefault(relatedReductionKey, Collections.emptyList()).stream()
+                        .filter(e -> e.getTimestamp().getTime() >= alarmLifespan.getStartMs() && e.getTimestamp().getTime() <= alarmLifespan.getEndMs())
+                        .forEach(eventsInAlarm::add);
+
+                allEventsInSituation.addAll(eventsInAlarm);
+            }
+
+            if (allEventsInSituation.isEmpty()) {
+                LOG.warn("No events found for situation: {}", situationDtos.get(0).getReductionKey());
+                continue;
+            }
+
+            situationsAndEvents.add(new SituationAndEvents(situationDtos, allEventsInSituation));
+        }
+        return situationsAndEvents;
+    }
+
+    private static Lifespan getLifespan(List<AlarmDocumentDTO> alarmDtos) {
+        final long minTime = alarmDtos.stream().mapToLong(AlarmDocumentDTO::getFirstEventTime).min().getAsLong();
+        final long maxTime = alarmDtos.stream().mapToLong(AlarmDocumentDTO::getLastEventTime).max().getAsLong();
+        return new Lifespan(minTime, maxTime);
+    }
+
+    private NodeAndEvents retrieveAndPairEvents(NodeAndFacts nodeAndFacts) throws IOException, ExecutionException, InterruptedException {
+        final List<EventRecord> cpnSyslogEvents = new ArrayList<>();
+        final List<TrapRecord> cpnTrapEvents = new ArrayList<>();
+        final List<ESEventDTO> onmsTrapEvents = new ArrayList<>();
+        final List<ESEventDTO> onmsSyslogEvents = new ArrayList<>();
+
+        // Retrieve syslog records for the given host
+        LOG.debug("Retrieving CPN syslog records for: {}", nodeAndFacts.getCpnHostname());
+        esDataProvider.getSyslogRecordsInRange(start, end, Arrays.asList(matchPhraseQuery("location", nodeAndFacts.getCpnHostname())), cpnEventExcludes,  syslogs -> {
+            for (EventRecord syslog : syslogs) {
+                // Skip clears
+                if (EventUtils.isClear(syslog)) {
+                    continue;
+                }
+                cpnSyslogEvents.add(syslog);
+            }
+        });
+
+        // Retrieve trap records for the given host
+        LOG.debug("Retrieving CPN trap records for: {}", nodeAndFacts.getCpnHostname());
+        esDataProvider.getTrapRecordsInRange(start, end, Arrays.asList(matchPhraseQuery("location", nodeAndFacts.getCpnHostname())), cpnEventExcludes,  traps -> {
+            for (TrapRecord trap : traps) {
+                // Skip clears
+                if (EventUtils.isClear(trap)) {
+                    continue;
+                }
+                cpnTrapEvents.add(trap);
+            }
+        });
+
+        // Retrieve the ONMS trap events
+        LOG.debug("Retrieving ONMS trap events for: {}", nodeAndFacts.getOpennmsNodeLabel());
+        onmsTrapEvents.addAll(eventClient.getTrapEvents(startMs, endMs, Arrays.asList(termQuery("nodeid", nodeAndFacts.getOpennmsNodeId()))));
+
+        // Retrieve the ONMS syslog events
+        LOG.debug("Retrieving ONMS syslog events for: {}", nodeAndFacts.getOpennmsNodeLabel());
+        onmsSyslogEvents.addAll(eventClient.getSyslogEvents(startMs, endMs, Arrays.asList(termQuery("nodeid", nodeAndFacts.getOpennmsNodeId()))));
+        LOG.debug("Done retrieving events for host. Found {} CPN syslogs, {} CPN traps, {} ONMS syslogs and {} ONMS traps.",
+                cpnSyslogEvents.size(), cpnTrapEvents.size(), onmsSyslogEvents.size(), onmsTrapEvents.size());
+
+        // Perform the matching
+        LOG.debug("Matching syslogs...");
+        Map<String, Integer> matchedSyslogs = EventMatcher.matchSyslogEventsScopedByTimeAndHost(cpnSyslogEvents, onmsSyslogEvents);
+        LOG.info("Matched {} syslog events.", matchedSyslogs.size());
+
+        LOG.debug("Matching traps.");
+        Map<String, Integer> matchedTraps = EventMatcher.matchTrapEventsScopedByTimeAndHost(cpnTrapEvents, onmsTrapEvents);
+        LOG.debug("Matched {} trap events.", matchedTraps.size());
+
+        return new NodeAndEvents(nodeAndFacts, cpnSyslogEvents, onmsSyslogEvents, matchedSyslogs, cpnTrapEvents, onmsTrapEvents, matchedTraps);
     }
 
     private void printEventMatches(Map<String, Integer> pairs, List<? extends MatchingSyslogEventRecord> cpnEvents, List<ESEventDTO> onmsEvents) {

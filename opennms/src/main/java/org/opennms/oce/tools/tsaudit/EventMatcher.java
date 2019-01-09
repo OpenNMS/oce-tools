@@ -51,7 +51,7 @@ import org.snmp4j.smi.OID;
 public class EventMatcher {
     private static final long timeDeltaAllowedMs = TimeUnit.MILLISECONDS.convert(120, TimeUnit.SECONDS);
 
-    public static Map<String, Integer> matchSyslogEventsScopedByTimeAndHost(List<MatchingSyslogEventRecord> cpnSyslogs, List<ESEventDTO> onmsSyslogs)
+    public static Map<String, Integer> matchSyslogEventsScopedByTimeAndHost(List<? extends MatchingSyslogEventRecord> cpnSyslogs, List<ESEventDTO> onmsSyslogs)
             throws ExecutionException, InterruptedException {
         // Group the syslogs by node
         List<GenericSyslogMessage> genericCpnSyslogs = mapSyslogMessagesFromCpn(cpnSyslogs);
@@ -87,7 +87,7 @@ public class EventMatcher {
         return potentialMatches;
     }
 
-    public static Map<String, Integer> matchTrapEventsScopedByTimeAndHost(List<MatchingTrapEventRecord> cpnTraps,
+    public static Map<String, Integer> matchTrapEventsScopedByTimeAndHost(List<? extends MatchingTrapEventRecord> cpnTraps,
                                                                           List<ESEventDTO> onmsTraps) {
         // Group the traps by node and sort them by time
         Map<String, List<MatchingTrapEventRecord>> cpnTrapsByType = groupCpnTrapsByType(cpnTraps);
@@ -118,7 +118,7 @@ public class EventMatcher {
         return Collections.unmodifiableMap(cpnEventIdToOnmsEventId);
     }
 
-    private static List<GenericSyslogMessage> mapSyslogMessagesFromCpn(List<MatchingSyslogEventRecord> syslogEvents) throws ExecutionException, InterruptedException {
+    private static List<GenericSyslogMessage> mapSyslogMessagesFromCpn(List<? extends MatchingSyslogEventRecord> syslogEvents) throws ExecutionException, InterruptedException {
         List<GenericSyslogMessage> genericSyslogMessages = new ArrayList<>();
 
         for (MatchingSyslogEventRecord syslogEvent : syslogEvents) {
@@ -140,7 +140,7 @@ public class EventMatcher {
         return genericSyslogMessages;
     }
 
-    private static Map<String, List<MatchingTrapEventRecord>> groupCpnTrapsByType(List<MatchingTrapEventRecord> cpnTraps) {
+    private static Map<String, List<MatchingTrapEventRecord>> groupCpnTrapsByType(List<? extends MatchingTrapEventRecord> cpnTraps) {
         Map<String, List<MatchingTrapEventRecord>> cpnTrapsByType = new HashMap<>();
 
         for (MatchingTrapEventRecord cpnTrap : cpnTraps) {

@@ -58,6 +58,12 @@ public class ESEventDTO {
     @SerializedName("p_oids")
     private List<Map<String, String>> p_oids;
 
+    @SerializedName("alarmreductionkey")
+    private String alarmReductionKey;
+
+    @SerializedName("alarmclearkey")
+    private String alarmClearKey;
+
     public String getNodeLabel() {
         return nodeLabel;
     }
@@ -127,6 +133,22 @@ public class ESEventDTO {
         this.logMessage = logMessage;
     }
 
+    public String getAlarmReductionKey() {
+        return alarmReductionKey;
+    }
+
+    public void setAlarmReductionKey(String alarmReductionKey) {
+        this.alarmReductionKey = alarmReductionKey;
+    }
+
+    public String getAlarmClearKey() {
+        return alarmClearKey;
+    }
+
+    public void setAlarmClearKey(String alarmClearKey) {
+        this.alarmClearKey = alarmClearKey;
+    }
+
     @Override
     public String toString() {
         return "ESEventDTO{" +
@@ -137,6 +159,8 @@ public class ESEventDTO {
                 ", id=" + id +
                 ", logMessage='" + logMessage + '\'' +
                 ", p_oids=" + p_oids +
+                ", alarmReductionKey='" + alarmReductionKey + '\'' +
+                ", alarmClearKey='" + alarmClearKey + '\'' +
                 '}';
     }
 }

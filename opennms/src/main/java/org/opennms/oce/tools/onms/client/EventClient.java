@@ -247,6 +247,21 @@ public class EventClient {
         return situations;
     }
 
+    public List<AlarmDocumentDTO> getSituationsOnNodeId(long startMs, long endMs, int nodeId) throws IOException {
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(QueryBuilders.boolQuery()
+                .must(termQuery("situation", "true"))
+                .must(termQuery("node.id", nodeId))
+                .must(rangeQuery("@update_time").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
+        final Search search = new Search.Builder(searchSourceBuilder.toString())
+                .setParameter(Parameters.SCROLL, "5m")
+                .build();
+
+        final List<AlarmDocumentDTO> situations = new ArrayList<>();
+        scroll(search, AlarmDocumentDTO.class, situations::addAll);
+        return situations;
+    }
+
     public List<AlarmDocumentDTO> getAlarmsByIds(List<Integer> alarmIds) throws IOException {
         if (alarmIds == null || alarmIds.isEmpty()) {
             return Collections.emptyList();
@@ -262,6 +277,21 @@ public class EventClient {
         final List<AlarmDocumentDTO> alarms = new ArrayList<>();
         scroll(search, AlarmDocumentDTO.class, alarms::addAll);
         return alarms;
+    }
+
+    public List<AlarmDocumentDTO> getAlarmsInSituationsOnNodeId(long startMs, long endMs, int nodeId) throws IOException {
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(QueryBuilders.boolQuery()
+                .must(termQuery("part_of_situation", "true"))
+                .must(termQuery("node.id", nodeId))
+                .must(rangeQuery("@update_time").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
+        final Search search = new Search.Builder(searchSourceBuilder.toString())
+                .setParameter(Parameters.SCROLL, "5m")
+                .build();
+
+        final List<AlarmDocumentDTO> situations = new ArrayList<>();
+        scroll(search, AlarmDocumentDTO.class, situations::addAll);
+        return situations;
     }
 
     public List<ESEventDTO> getEventsByIds(List<Integer> eventIds) throws IOException {
