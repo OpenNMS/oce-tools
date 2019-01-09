@@ -28,7 +28,7 @@
 
 package org.opennms.oce.tools.cpn.events;
 
-public interface MatchingSyslogEventRecord {
+public interface MatchingSyslogEventRecord extends EventRecordLite {
     String getDetailedDescription();
     String getEventId();
     String getLocation();

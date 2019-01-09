@@ -57,6 +57,7 @@ import org.apache.commons.csv.CSVPrinter;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.cpn.EventUtils;
+import org.opennms.oce.tools.cpn.events.EventRecordLite;
 import org.opennms.oce.tools.cpn.events.MatchingSyslogEventRecord;
 import org.opennms.oce.tools.cpn.events.MatchingTrapEventRecord;
 import org.opennms.oce.tools.cpn.model.EventRecord;
@@ -172,11 +173,43 @@ public class TSAudit {
             LOG.info("Matching syslogs...");
             Map<String, Integer> matchedSyslogs = EventMatcher.matchSyslogEventsScopedByTimeAndHost(cpnSyslogEvents, onmsSyslogEvents);
             LOG.info("Matched {} syslog events.", matchedSyslogs.size());
+            printEventMatches(matchedSyslogs, cpnSyslogEvents, onmsSyslogEvents);
 
             LOG.info("Matching traps.");
             Map<String, Integer> matchedTraps = EventMatcher.matchTrapEventsScopedByTimeAndHost(cpnTrapEvents, onmsTrapEvents);
-            LOG.info("Matched {} trap events.", matchedTraps.size());
+            LOG.debug("Matched {} trap events.", matchedTraps.size());
+            printEventMatches(matchedTraps, cpnTrapEvents, onmsTrapEvents);
         }
+    }
+
+    private void printEventMatches(Map<String, Integer> pairs, List<? extends MatchingSyslogEventRecord> cpnEvents, List<ESEventDTO> onmsEvents) {
+        AsciiTable at = new AsciiTable();
+        at.addRule();
+        at.addRow("CPN Event ID", "CPN Event Descr", "CPN Event Location", "OpenNMS Event ID", "OpenNMS Event LogMsg");
+        at.addRule();
+
+        for (MatchingSyslogEventRecord cpnEvent : cpnEvents) {
+
+            Integer onmsEventId = pairs.get(cpnEvent.getEventId());
+            String onmsEventLogMsg = null;
+            if (onmsEventId != null) {
+                ESEventDTO onmsEvent = onmsEvents.stream().filter(e -> onmsEventId.equals(e.getId())).findAny().get();
+                onmsEventLogMsg = onmsEvent.getLogMessage();
+            }
+
+            at.addRow(cpnEvent.getEventId(),
+                    cpnEvent.getDescription(),
+                    cpnEvent.getLocation(),
+                    naWhenNull(onmsEventId),
+                    naWhenNull(onmsEventLogMsg));
+            at.addRule();
+        }
+
+
+        CWC_LongestLine cwc = new CWC_LongestLine();
+        at.getRenderer().setCWC(cwc);
+
+        System.out.println(at.render());
     }
 
     private List<NodeAndFacts> getNodesAndFacts() throws IOException {
@@ -298,10 +331,8 @@ public class TSAudit {
                 if (processedTime.compareTo(maxTimeRef.get()) > 0) {
                     maxTimeRef.set(processedTime);
                 }
-
             }
         });
-
 
         NodeAndFacts.ClockSkewStatus clockSkewStatus = NodeAndFacts.ClockSkewStatus.INDETERMINATE;
         Long clockSkew = null;

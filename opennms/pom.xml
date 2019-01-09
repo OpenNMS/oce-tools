@@ -37,6 +37,11 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.opennms.oce.tools</groupId>
+            <artifactId>cpn2oce</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.opennms.oce.integrations.opennms</groupId>
             <artifactId>model</artifactId>
             <version>${oce.version}</version>

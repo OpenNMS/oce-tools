@@ -51,6 +51,9 @@ public class ESEventDTO {
 
     @SerializedName("id")
     private Integer id;
+
+    @SerializedName("logmsg")
+    private String logMessage;
     
     @SerializedName("p_oids")
     private List<Map<String, String>> p_oids;
@@ -116,6 +119,14 @@ public class ESEventDTO {
         return Optional.empty();
     }
 
+    public String getLogMessage() {
+        return logMessage;
+    }
+
+    public void setLogMessage(String logMessage) {
+        this.logMessage = logMessage;
+    }
+
     @Override
     public String toString() {
         return "ESEventDTO{" +
@@ -124,8 +135,8 @@ public class ESEventDTO {
                 ", syslogMessage='" + syslogMessage + '\'' +
                 ", timestamp=" + timestamp +
                 ", id=" + id +
+                ", logMessage='" + logMessage + '\'' +
                 ", p_oids=" + p_oids +
                 '}';
     }
 }
-

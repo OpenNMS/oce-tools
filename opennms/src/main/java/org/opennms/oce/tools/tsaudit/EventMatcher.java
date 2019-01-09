@@ -37,11 +37,16 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.opennms.oce.tools.cpn.EventUtils;
 import org.opennms.oce.tools.cpn.events.MatchingSyslogEventRecord;
 import org.opennms.oce.tools.cpn.events.MatchingTrapEventRecord;
+import org.opennms.oce.tools.cpn2oce.EventMapper;
+import org.opennms.oce.tools.cpn2oce.model.ModelObject;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
+import org.opennms.oce.tools.onms.model.v1.OnmsSnmpConstants;
+import org.snmp4j.smi.OID;
 
 public class EventMatcher {
     private static final long timeDeltaAllowedMs = TimeUnit.MILLISECONDS.convert(120, TimeUnit.SECONDS);
@@ -67,6 +72,21 @@ public class EventMatcher {
         return Collections.unmodifiableMap(cpnEventIdToOnmsEventId);
     }
 
+    private static List<ESEventDTO> filterMatchesForTrap(MatchingTrapEventRecord cpnTrap, List<ESEventDTO> potentialMatches) {
+        if (oid2str(OnmsSnmpConstants.linkDown).equals(cpnTrap.getTrapTypeOid()) ||
+                oid2str(OnmsSnmpConstants.linkUp).equals(cpnTrap.getTrapTypeOid())) {
+            // We know we a link up/down trap, extract the port from the location
+            final ModelObject mo = EventMapper.createPortObject(cpnTrap);
+            String ifDescr = mo.getSpecificId(); // the *specific* id of the interface object is the ifDescr!
+
+            return potentialMatches.stream()
+                    .filter(e -> e.getP_oids().stream()
+                            .anyMatch(oidMap -> oidMap.get("oid").startsWith(oid2str(OnmsSnmpConstants.ifDescr)) && oidMap.get("value").equals(ifDescr)))
+                    .collect(Collectors.toList());
+        }
+        return potentialMatches;
+    }
+
     public static Map<String, Integer> matchTrapEventsScopedByTimeAndHost(List<MatchingTrapEventRecord> cpnTraps,
                                                                           List<ESEventDTO> onmsTraps) {
         // Group the traps by node and sort them by time
@@ -79,14 +99,17 @@ public class EventMatcher {
         for (Map.Entry<String, List<MatchingTrapEventRecord>> cpnEntry : cpnTrapsByType.entrySet()) {
 
             String type = cpnEntry.getKey();
-            List<MatchingTrapEventRecord> cpnSyslogsForOid = cpnEntry.getValue();
+            List<MatchingTrapEventRecord> cpnTrapsForOid = cpnEntry.getValue();
             // Find the potential matches by looking up all the Onms traps for the same type
             List<ESEventDTO> potentialMatches = onmsTrapsByType.get(type);
 
             if (potentialMatches != null) {
-                for (MatchingTrapEventRecord cpnTrap : cpnSyslogsForOid) {
+                for (MatchingTrapEventRecord cpnTrap : cpnTrapsForOid) {
+                    // Refine the potential matches for this specific instance of the trap
+                    List<ESEventDTO> refinedPotentialMatches = filterMatchesForTrap(cpnTrap, potentialMatches);
+
                     // Find the closest matching event (by time delta) within the allowed time range
-                    timeWindowSearch(cpnTrap.getTime().getTime(), potentialMatches)
+                    timeWindowSearch(cpnTrap.getTime().getTime(), refinedPotentialMatches)
                             .ifPresent(id -> cpnEventIdToOnmsEventId.put(cpnTrap.getEventId(), id));
                 }
             }
@@ -394,5 +417,9 @@ public class EventMatcher {
         }
 
         return onmsTrapsByHost;
+    }
+
+    private static String oid2str(OID oid) {
+        return "." + oid.toDottedString();
     }
 }

@@ -47,6 +47,71 @@ import org.opennms.oce.tools.cpn.events.MatchingTrapEventRecord;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 
 public class EventMatcherTest {
+
+    @Test
+    public void canMatchLinkDownTraps() {
+        List<MatchingTrapEventRecord> cpnTraps = new ArrayList<>();
+        List<ESEventDTO> onmsTraps = new ArrayList<>();
+
+        Date ts = new Date();
+
+        String cpnId = "101";
+        String host = "testhost";
+        int ifIndex = 436305920;
+        String ifDescr = "Ethernet1/32";
+        String location = String.format("%s: %s", host, ifDescr);
+
+        String trapType = ".1.3.6.1.6.3.1.1.5.3";
+        MatchingTrapEventRecord t1 = new ImplMatchingTrapEventRecord(cpnId, location, ts, trapType);
+
+        cpnTraps.add(t1);
+
+        ESEventDTO e1 = new ESEventDTO();
+        Integer onmsId = 1;
+        e1.setId(onmsId);
+        e1.setNodeLabel(host);
+        e1.setTimestamp(new Date(ts.getTime() - 20000));
+        setTrapTypeOid(e1, trapType);
+        setIfDescrOid(e1, ifIndex, ifDescr);
+
+        onmsTraps.add(e1);
+
+        Map<String, Integer> matchedTraps = EventMatcher.matchTrapEventsScopedByTimeAndHost(cpnTraps, onmsTraps);
+        assertThat(matchedTraps.get(cpnId), equalTo(onmsId));
+    }
+
+    @Test
+    public void canNotMatchLinkDownTraps() {
+        List<MatchingTrapEventRecord> cpnTraps = new ArrayList<>();
+        List<ESEventDTO> onmsTraps = new ArrayList<>();
+
+        Date ts = new Date();
+
+        String cpnId = "101";
+        String host = "testhost";
+        int ifIndex = 436305920;
+        String ifDescr = "Ethernet1/32";
+        String location = String.format("%s: %s", host, ifDescr);
+
+        String trapType = ".1.3.6.1.6.3.1.1.5.3";
+        MatchingTrapEventRecord t1 = new ImplMatchingTrapEventRecord(cpnId, location, ts, trapType);
+
+        cpnTraps.add(t1);
+
+        ESEventDTO e1 = new ESEventDTO();
+        Integer onmsId = 1;
+        e1.setId(onmsId);
+        e1.setNodeLabel(host);
+        e1.setTimestamp(new Date(ts.getTime() - 20000));
+        setTrapTypeOid(e1, trapType);
+        setIfDescrOid(e1, ifIndex, ifDescr + "/0"); // NOT THE SAME AS THE CPN TRAP
+
+        onmsTraps.add(e1);
+
+        Map<String, Integer> matchedTraps = EventMatcher.matchTrapEventsScopedByTimeAndHost(cpnTraps, onmsTraps);
+        assertThat(matchedTraps.containsKey(cpnId), equalTo(false));
+    }
+
     @Ignore("Test used the grouping by host methods which are not tested")
     @Test
     public void testMatchingSyslogs() throws ExecutionException, InterruptedException {
@@ -137,12 +202,22 @@ public class EventMatcherTest {
         if (event.getP_oids() != null) {
             event.getP_oids().clear();
         }
+
         List<Map<String, String>> p_oids = new ArrayList<>();
         Map<String, String> trapType = new HashMap<>();
-        trapType.put(".1.3.6.1.6.3.1.1.4.3.0", trapTypeOid);
+        trapType.put("oid", ".1.3.6.1.6.3.1.1.4.3.0");
+        trapType.put("value", trapTypeOid);
         p_oids.add(trapType);
 
         event.setP_oids(p_oids);
+    }
+
+    private void setIfDescrOid(ESEventDTO event, int ifIndex, String ifDescr) {
+        List<Map<String, String>> p_oids = event.getP_oids();
+        Map<String, String> ifDescrVb = new HashMap<>();
+        ifDescrVb.put("oid", ".1.3.6.1.2.1.2.2.1.2." + ifIndex);
+        ifDescrVb.put("value", ifDescr);
+        p_oids.add(ifDescrVb);
     }
 
     static class ImplMatchingTrapEventRecord implements MatchingTrapEventRecord {
@@ -180,6 +255,11 @@ public class EventMatcherTest {
         }
 
         @Override
+        public String getDescription() {
+            return null;
+        }
+
+        @Override
         public String getLocation() {
             return location;
         }
@@ -204,6 +284,11 @@ public class EventMatcherTest {
         @Override
         public String getEventId() {
             return id;
+        }
+
+        @Override
+        public String getDescription() {
+            return null;
         }
 
         @Override
