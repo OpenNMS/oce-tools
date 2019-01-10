@@ -30,7 +30,8 @@ echo 'clusters:
     url: http://localhost:9200
     read-timeout: 120000
     conn-timeout: 30000
-    opennms-event-index: opennms-events-raw-*' > ~/.oce/es-config.yaml
+    opennms-event-index: opennms-events-raw-*
+    opennms-alarm-index: opennms-alarms-*' > ~/.oce/es-config.yaml
 ```
 
 You can run the tool and enumerate the available commands using:

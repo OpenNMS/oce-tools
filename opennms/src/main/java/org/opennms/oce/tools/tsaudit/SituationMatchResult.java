@@ -26,13 +26,36 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.oce.tools.cpn.events;
+package org.opennms.oce.tools.tsaudit;
 
-import java.util.Date;
+import java.util.List;
+import java.util.Objects;
 
-public interface MatchingSyslogEventRecord extends EventRecordLite {
-    Date getTime();
-    String getDetailedDescription();
-    String getEventId();
-    String getLocation();
+public class SituationMatchResult {
+
+    private final CanonicalSituation source;
+    private final CanonicalSituation exactMatch;
+    private final List<CanonicalSituation> partialMatches;
+
+    public SituationMatchResult(CanonicalSituation source, CanonicalSituation exactMatch, List<CanonicalSituation> partialMatches) {
+        this.source = Objects.requireNonNull(source);
+        this.exactMatch = exactMatch;
+        this.partialMatches = Objects.requireNonNull(partialMatches);
+    }
+
+    public CanonicalSituation getSource() {
+        return source;
+    }
+
+    public CanonicalSituation getExactMatch() {
+        return exactMatch;
+    }
+
+    public List<CanonicalSituation> getPartialMatches() {
+        return partialMatches;
+    }
+
+    public boolean anyMatch() {
+        return exactMatch != null || !partialMatches.isEmpty();
+    }
 }

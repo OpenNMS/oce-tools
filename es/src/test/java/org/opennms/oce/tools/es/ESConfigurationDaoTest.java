@@ -52,5 +52,6 @@ public class ESConfigurationDaoTest {
         assertThat(clusterConfig.getConnTimeout(), equalTo(30000));
 
         assertThat(clusterConfig.getOpennmsEventIndex(), equalTo("opennms-events-raw-*"));
+        assertThat(clusterConfig.getOpennmsAlarmIndex(), equalTo("opennms-alarms-*"));
     }
 }

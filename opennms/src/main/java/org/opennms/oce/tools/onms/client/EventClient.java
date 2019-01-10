@@ -254,6 +254,7 @@ public class EventClient {
                 .must(termQuery("node.id", nodeId))
                 .must(rangeQuery("@update_time").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
         final Search search = new Search.Builder(searchSourceBuilder.toString())
+                .addIndex(esClusterConfiguration.getOpennmsAlarmIndex())
                 .setParameter(Parameters.SCROLL, "5m")
                 .build();
 
@@ -279,13 +280,14 @@ public class EventClient {
         return alarms;
     }
 
-    public List<AlarmDocumentDTO> getAlarmsInSituationsOnNodeId(long startMs, long endMs, int nodeId) throws IOException {
+    public List<AlarmDocumentDTO> getAlarmsOnNodeId(long startMs, long endMs, int nodeId) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.boolQuery()
-                .must(termQuery("part_of_situation", "true"))
+                //.must(termQuery("part_of_situation", "true"))
                 .must(termQuery("node.id", nodeId))
                 .must(rangeQuery("@update_time").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
         final Search search = new Search.Builder(searchSourceBuilder.toString())
+                .addIndex(esClusterConfiguration.getOpennmsAlarmIndex())
                 .setParameter(Parameters.SCROLL, "5m")
                 .build();
 

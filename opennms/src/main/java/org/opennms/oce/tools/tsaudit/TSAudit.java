@@ -43,7 +43,6 @@ import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.LongSummaryStatistics;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -60,7 +59,6 @@ import org.elasticsearch.index.query.QueryBuilder;
 import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.cpn.EventUtils;
 import org.opennms.oce.tools.cpn.events.MatchingSyslogEventRecord;
-import org.opennms.oce.tools.cpn.events.MatchingTrapEventRecord;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.TicketRecord;
 import org.opennms.oce.tools.cpn.model.TrapRecord;
@@ -69,6 +67,8 @@ import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.Lists;
 
 import de.vandermeer.asciitable.AsciiTable;
 import de.vandermeer.asciitable.CWC_LongestLine;
@@ -140,13 +140,12 @@ public class TSAudit {
             final List<SituationAndEvents> situationsAndEvents = getSituationsAndPairEvents(nodeAndEvents);
 
             // Match
-            match(nodeAndEvents, ticketsAndEvents, situationsAndEvents);
-
-            // TODO: Further matching, and reporting
+            final List<SituationMatchResult> matchResults = match(nodeAndEvents, ticketsAndEvents, situationsAndEvents);
+            printSituationMatches(matchResults);
         }
     }
 
-    private void match(NodeAndEvents nodeAndEvents, List<TicketAndEvents> ticketsAndEvents, List<SituationAndEvents> situationsAndEvents) {
+    private List<SituationMatchResult> match(NodeAndEvents nodeAndEvents, List<TicketAndEvents> ticketsAndEvents, List<SituationAndEvents> situationsAndEvents) {
         final Map<String, Integer> matchedEvents = nodeAndEvents.getMatchedEvents();
 
         // Convert to canonical situations for easy comparision
@@ -158,26 +157,57 @@ public class TSAudit {
                 .map(CanonicalSituation::new)
                 .collect(Collectors.toList());
 
-        // Now try to find exact matches
+        // Now try to match up
+        final List<SituationMatchResult> situationMatchResults = new LinkedList<>();
         for (CanonicalSituation cpnCanonicalSituation : cpnCanonicalSituations) {
+            CanonicalSituation exactMatch = null;
+            final List<CanonicalSituation> partialMatches = new LinkedList<>();
+
             for (CanonicalSituation onmsCanonicalSituation : onmsCanonicalSituations) {
                 if (cpnCanonicalSituation.equals(onmsCanonicalSituation)) {
-                    System.out.printf("Found exact match on CPN ticket id: %s to OpenNMS situation id: %s\n",
+                    exactMatch = onmsCanonicalSituation;
+                    LOG.debug("Found exact match on CPN ticket id: {} to OpenNMS situation id: {}",
                             cpnCanonicalSituation.getSourceId(),
                             onmsCanonicalSituation.getSourceId());
+                    break;
                 } else if (onmsCanonicalSituation.contains(cpnCanonicalSituation)) {
-                    System.out.printf("Found partial match (CPN ticket in ONMS situation) on CPN ticket id: %s to OpenNMS situation id: %s\n",
+                    partialMatches.add(onmsCanonicalSituation);
+                    LOG.debug("Found partial match (CPN ticket in ONMS situation) on CPN ticket id: {} to OpenNMS situation id: {}",
                             cpnCanonicalSituation.getSourceId(),
                             onmsCanonicalSituation.getSourceId());
                 } else if (cpnCanonicalSituation.contains(onmsCanonicalSituation)) {
-                    System.out.printf("Found partial match (ONMS situation in CPN ticket) on CPN ticket id: %s to OpenNMS situation id: %s\n",
+                    partialMatches.add(onmsCanonicalSituation);
+                    LOG.debug("Found partial match (ONMS situation in CPN ticket) on CPN ticket id: {} to OpenNMS situation id: {}",
                             cpnCanonicalSituation.getSourceId(),
                             onmsCanonicalSituation.getSourceId());
                 }
             }
+            situationMatchResults.add(new SituationMatchResult(cpnCanonicalSituation, exactMatch, partialMatches));
         }
 
-        // TODO: Better matching and partial matching
+        return situationMatchResults;
+    }
+
+    private void printSituationMatches(List<SituationMatchResult> matchResults) {
+        AsciiTable at = new AsciiTable();
+        at.addRule();
+        at.addRow("CPN Ticket ID", "Any Match?", "OpenNMS Situation ID (Exact Match)", "OpenNMS Situation IDs (Partial Matches)");
+        at.addRule();
+
+        for (SituationMatchResult matchResult : matchResults) {
+            at.addRow(matchResult.getSource().getSourceId(),
+                    matchResult.anyMatch() ? "Yes" : "No",
+                    naWhenNull(matchResult.getExactMatch() != null ? matchResult.getExactMatch().getSourceId() : null),
+                    matchResult.getPartialMatches().isEmpty() ? "N/A" : matchResult.getPartialMatches().stream()
+                            .map(CanonicalSituation::getSourceId).collect(Collectors.joining(",")));
+            at.addRule();
+        }
+
+
+        CWC_LongestLine cwc = new CWC_LongestLine();
+        at.getRenderer().setCWC(cwc);
+
+        System.out.println(at.render());
     }
 
     private List<TicketAndEvents> getTicketsAndPairEvents(NodeAndEvents nodeAndEvents) throws IOException {
@@ -214,7 +244,7 @@ public class TSAudit {
         // Retrieve the situations and alarms
         final int nodeId = nodeAndEvents.getNodeAndFacts().getOpennmsNodeId();
         final List<AlarmDocumentDTO> allSituationDtos = eventClient.getSituationsOnNodeId(startMs, endMs, nodeId);
-        final List<AlarmDocumentDTO> alarmDtos = eventClient.getAlarmsInSituationsOnNodeId(startMs, endMs, nodeId);
+        final List<AlarmDocumentDTO> alarmDtos = eventClient.getAlarmsOnNodeId(startMs, endMs, nodeId);
 
         // Group the situations by id
         final Map<Integer, List<AlarmDocumentDTO>> situationsById = allSituationDtos.stream()
@@ -236,39 +266,51 @@ public class TSAudit {
         // Process each situation
         final List<SituationAndEvents> situationsAndEvents = new LinkedList<>();
         for (List<AlarmDocumentDTO> situationDtos : situationsById.values()) {
+            final String situationReductionKey = situationDtos.get(0).getReductionKey();
             // Gather all of the related reduction keys
             final Set<String> relatedReductionKeys = situationDtos.stream()
                     .flatMap(s -> s.getRelatedAlarmReductionKeys().stream())
                     .collect(Collectors.toSet());
 
             // Gather the events in the related alarms
+            boolean didFindAlarmDocumentsForAtLeaseOneRelatedAlarm = false;
             final List<ESEventDTO> allEventsInSituation = new LinkedList<>();
             for (String relatedReductionKey : relatedReductionKeys) {
                 // For every related alarm, determine it's lifespan
                 final List<AlarmDocumentDTO> relatedAlarmDtos = alarmsByReductionKey.getOrDefault(relatedReductionKey, Collections.emptyList());
                 if (relatedAlarmDtos.isEmpty()) {
+                    LOG.warn("No alarms documents found for related reduction key: {} on situation with reduction key: {}",
+                            relatedReductionKey, situationReductionKey);
+
                     // No events to gather here
                     continue;
                 }
+                didFindAlarmDocumentsForAtLeaseOneRelatedAlarm = true;
 
-                final Lifespan alarmLifespan = getLifespan(relatedAlarmDtos);
-
-                // Now find events that relate to this reduction key in the given timespan
+                // Now find events that relate to this reduction key in the computed lifespan
+                final Lifespan alarmLifespan = getLifespan(relatedAlarmDtos, startMs, endMs);
                 final List<ESEventDTO> eventsInAlarm = new LinkedList<>();
                 eventsByReductionKey.getOrDefault(relatedReductionKey, Collections.emptyList()).stream()
                         .filter(e -> e.getTimestamp().getTime() >= alarmLifespan.getStartMs() && e.getTimestamp().getTime() <= alarmLifespan.getEndMs())
                         .forEach(eventsInAlarm::add);
 
-                // Now find events that relate to this clear key in the given timespan
+                // Now find events that relate to this clear key in the given lifespan
                 eventsByClearKey.getOrDefault(relatedReductionKey, Collections.emptyList()).stream()
                         .filter(e -> e.getTimestamp().getTime() >= alarmLifespan.getStartMs() && e.getTimestamp().getTime() <= alarmLifespan.getEndMs())
                         .forEach(eventsInAlarm::add);
 
+                if (eventsInAlarm.isEmpty()) {
+                    LOG.warn("No events found for alarm with reduction key: {}", relatedReductionKey);
+                }
+
                 allEventsInSituation.addAll(eventsInAlarm);
             }
 
-            if (allEventsInSituation.isEmpty()) {
-                LOG.warn("No events found for situation: {}", situationDtos.get(0).getReductionKey());
+            if (!didFindAlarmDocumentsForAtLeaseOneRelatedAlarm) {
+                LOG.warn("No alarms found for situation: {}", situationReductionKey);
+                continue;
+            } else if (allEventsInSituation.isEmpty()) {
+                LOG.warn("No events found for situation: {}", situationReductionKey);
                 continue;
             }
 
@@ -277,9 +319,22 @@ public class TSAudit {
         return situationsAndEvents;
     }
 
-    private static Lifespan getLifespan(List<AlarmDocumentDTO> alarmDtos) {
-        final long minTime = alarmDtos.stream().mapToLong(AlarmDocumentDTO::getFirstEventTime).min().getAsLong();
-        final long maxTime = alarmDtos.stream().mapToLong(AlarmDocumentDTO::getLastEventTime).max().getAsLong();
+    /**
+     * Compute the lifespan of an alarm given some subset of the it's alarm documents.
+     */
+    private static Lifespan getLifespan(List<AlarmDocumentDTO> alarmDtos, long startMs, long endMs) {
+        // Use the first-event time of the first record, or default to startMs if none was found
+        final long minTime = alarmDtos.stream()
+                .filter(a -> a.getDeletedTime() == null)
+                .findAny().map(AlarmDocumentDTO::getFirstEventTime)
+                .orElse(startMs);
+
+        // Use the delete time, or default to endMs if none was found
+        final long maxTime = alarmDtos.stream()
+                .filter(a -> a.getDeletedTime() != null)
+                .findAny().map(AlarmDocumentDTO::getDeletedTime)
+                .orElse(endMs);
+
         return new Lifespan(minTime, maxTime);
     }
 
@@ -338,21 +393,28 @@ public class TSAudit {
     private void printEventMatches(Map<String, Integer> pairs, List<? extends MatchingSyslogEventRecord> cpnEvents, List<ESEventDTO> onmsEvents) {
         AsciiTable at = new AsciiTable();
         at.addRule();
-        at.addRow("CPN Event ID", "CPN Event Descr", "CPN Event Location", "OpenNMS Event ID", "OpenNMS Event LogMsg");
+        at.addRow("CPN Event ID", "CPN Event Descr", "CPN Event Location", "CPN Event Time", "OpenNMS Event Time", "OpenNMS Event ID", "OpenNMS Event LogMsg");
         at.addRule();
 
-        for (MatchingSyslogEventRecord cpnEvent : cpnEvents) {
+        final List<? extends MatchingSyslogEventRecord> sortedCpnEvents = Lists.newArrayList(cpnEvents);
+        sortedCpnEvents.sort(Comparator.comparing(MatchingSyslogEventRecord::getTime)
+                .thenComparing(MatchingSyslogEventRecord::getEventId));
+        for (MatchingSyslogEventRecord cpnEvent : sortedCpnEvents) {
 
+            Date onmsEventTime = null;
             Integer onmsEventId = pairs.get(cpnEvent.getEventId());
             String onmsEventLogMsg = null;
             if (onmsEventId != null) {
                 ESEventDTO onmsEvent = onmsEvents.stream().filter(e -> onmsEventId.equals(e.getId())).findAny().get();
+                onmsEventTime = onmsEvent.getTimestamp();
                 onmsEventLogMsg = onmsEvent.getLogMessage();
             }
 
             at.addRow(cpnEvent.getEventId(),
                     cpnEvent.getDescription(),
                     cpnEvent.getLocation(),
+                    cpnEvent.getTime(),
+                    naWhenNull(onmsEventTime),
                     naWhenNull(onmsEventId),
                     naWhenNull(onmsEventLogMsg));
             at.addRule();
@@ -574,5 +636,9 @@ public class TSAudit {
 
     private static String naWhenNull(Number number) {
         return number != null ? number.toString() : "N/A";
+    }
+
+    private static String naWhenNull(Date date) {
+        return date != null ? date.toString() : "N/A";
     }
 }

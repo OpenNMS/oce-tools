@@ -46,6 +46,9 @@ public class ESClusterConfiguration {
     @JsonProperty("opennms-event-index")
     private String opennmsEventIndex;
 
+    @JsonProperty("opennms-alarm-index")
+    private String opennmsAlarmIndex;
+
     public String getName() {
         return name;
     }
@@ -84,5 +87,13 @@ public class ESClusterConfiguration {
 
     public void setOpennmsEventIndex(String opennmsEventIndex) {
         this.opennmsEventIndex = opennmsEventIndex;
+    }
+
+    public String getOpennmsAlarmIndex() {
+        return opennmsAlarmIndex;
+    }
+
+    public void setOpennmsAlarmIndex(String opennmsAlarmIndex) {
+        this.opennmsAlarmIndex = opennmsAlarmIndex;
     }
 }

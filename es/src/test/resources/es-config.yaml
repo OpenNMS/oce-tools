@@ -4,3 +4,4 @@ clusters:
     read-timeout: 120000
     conn-timeout: 30000
     opennms-event-index: opennms-events-raw-*
+    opennms-alarm-index: opennms-alarms-*

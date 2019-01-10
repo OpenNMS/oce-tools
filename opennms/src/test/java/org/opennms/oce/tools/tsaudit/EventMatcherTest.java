@@ -277,6 +277,11 @@ public class EventMatcherTest {
         }
 
         @Override
+        public Date getTime() {
+            return null;
+        }
+
+        @Override
         public String getDetailedDescription() {
             return detailedDescription;
         }
