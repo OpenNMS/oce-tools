@@ -29,7 +29,6 @@
 package org.opennms.oce.tools.tsaudit;
 
 import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 
@@ -40,7 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
-import org.junit.Ignore;
 import org.junit.Test;
 import org.opennms.oce.tools.cpn.events.MatchingSyslogEventRecord;
 import org.opennms.oce.tools.cpn.events.MatchingTrapEventRecord;
@@ -112,9 +110,8 @@ public class EventMatcherTest {
         assertThat(matchedTraps.containsKey(cpnId), equalTo(false));
     }
 
-    @Ignore("Test used the grouping by host methods which are not tested")
     @Test
-    public void testMatchingSyslogs() throws ExecutionException, InterruptedException {
+    public void canNotMatchEventTwice() throws ExecutionException, InterruptedException {
         List<MatchingSyslogEventRecord> cpnSyslogs = new ArrayList<>();
         List<ESEventDTO> onmsSyslogs = new ArrayList<>();
 
@@ -124,8 +121,12 @@ public class EventMatcherTest {
         String syslogMsg1 = syslogMsg1Header + syslogMsg1Body;
         String host1 = "testhost";
 
-        String cpnEventId = "1";
-        MatchingSyslogEventRecord s1 = new MatchingSyslogEventRecordImpl(cpnEventId, syslogMsg1, host1);
+        String cpnEventId1 = "1";
+        MatchingSyslogEventRecord s1 = new MatchingSyslogEventRecordImpl(cpnEventId1, syslogMsg1, host1);
+        // Dupe of s1 with a different Id
+        String cpnEventId2 = "2";
+        MatchingSyslogEventRecord s2 = new MatchingSyslogEventRecordImpl(cpnEventId2, syslogMsg1, host1);
+
 
         ESEventDTO e1 = new ESEventDTO();
         Integer onmsEventId = 101;
@@ -135,67 +136,13 @@ public class EventMatcherTest {
         e1.setTimestamp(SyslogParser.parse(syslogMsg1).getDate());
 
         cpnSyslogs.add(s1);
+        cpnSyslogs.add(s2);
+
         onmsSyslogs.add(e1);
 
-        Map<String, Integer> results = EventMatcher.matchSyslogEventsScopedByTime(cpnSyslogs, onmsSyslogs);
-        assertThat(results.get(cpnEventId), is(equalTo(onmsEventId)));
-        e1.setNodeLabel("fail");
-        results = EventMatcher.matchSyslogEventsScopedByTime(cpnSyslogs, onmsSyslogs);
-        assertThat(results.keySet(), hasSize(0));
-    }
-
-    @Ignore("Test used the grouping by host methods which are not tested")
-    @Test
-    public void testMatchingTraps() {
-        List<MatchingTrapEventRecord> cpnTraps = new ArrayList<>();
-        List<ESEventDTO> onmsTraps = new ArrayList<>();
-
-        Date ts = new Date();
-
-        String cpnId = "101";
-        String host = "testhost";
-        String trapType = ".1.2.3";
-        MatchingTrapEventRecord t1 = new ImplMatchingTrapEventRecord(cpnId, host, ts, trapType);
-
-        ESEventDTO e1 = new ESEventDTO();
-        Integer onmsId = 1;
-        e1.setId(onmsId);
-        e1.setNodeLabel(host);
-        e1.setTimestamp(new Date(ts.getTime() - 20000));
-        setTrapTypeOid(e1, trapType);
-
-        ESEventDTO e2 = new ESEventDTO();
-        Integer onmsId2 = 2;
-        e2.setId(onmsId2);
-        e2.setNodeLabel(host);
-        e2.setTimestamp(new Date(ts.getTime() - 10000));
-        setTrapTypeOid(e2, trapType);
-
-        cpnTraps.add(t1);
-        onmsTraps.add(e1);
-        onmsTraps.add(e2);
-
-        Map<String, Integer> results = EventMatcher.matchTrapEventsScopedByTime(cpnTraps, onmsTraps);
-        // match 2 since it is closer in time
-        assertThat(results.get(cpnId), is(equalTo(onmsId2)));
-
-        // both hosts are now wrong
-        e1.setNodeLabel("fail");
-        e2.setNodeLabel("fail");
-
-        results = EventMatcher.matchTrapEventsScopedByTime(cpnTraps, onmsTraps);
-        assertThat(results.keySet(), hasSize(0));
-
-        // right host, wrong trap type
-        e1.setNodeLabel(host);
-        setTrapTypeOid(e1, ".4.5.6");
-
-        // right host, wrong time
-        e2.setNodeLabel(host);
-        e2.setTimestamp(new Date(ts.getTime() + 30001));
-
-        results = EventMatcher.matchTrapEventsScopedByTime(cpnTraps, onmsTraps);
-        assertThat(results.keySet(), hasSize(0));
+        Map<String, Integer> results = EventMatcher.matchSyslogEventsScopedByTimeAndHost(cpnSyslogs, onmsSyslogs);
+        // only one should have matched since we don't allow matching the same Onms event to multiple cpn events
+        assertThat(results.values(), hasSize(1));
     }
 
     private void setTrapTypeOid(ESEventDTO event, String trapTypeOid) {

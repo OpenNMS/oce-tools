@@ -32,9 +32,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -50,6 +52,7 @@ import org.snmp4j.smi.OID;
 
 public class EventMatcher {
     private static final long timeDeltaAllowedMs = TimeUnit.MILLISECONDS.convert(120, TimeUnit.SECONDS);
+    private static final Set<Integer> alreadyMatchedOnmsEvents = new HashSet<>();
 
     public static Map<String, Integer> matchSyslogEventsScopedByTimeAndHost(List<? extends MatchingSyslogEventRecord> cpnSyslogs, List<ESEventDTO> onmsSyslogs)
             throws ExecutionException, InterruptedException {
@@ -62,17 +65,23 @@ public class EventMatcher {
         // Iterate through each list of syslogs
         for (GenericSyslogMessage cpnSyslog : genericCpnSyslogs) {
             genericOnmsSyslogs.stream()
-                    .filter(cpnSyslog::equalsIgnoringHost)
+                    .filter(candidateSyslog ->
+                            !alreadyMatchedOnmsEvents.contains(Integer.parseInt(candidateSyslog.getId())) &&
+                                    cpnSyslog.equalsIgnoringHost(candidateSyslog))
                     .findAny()
                     // If we found a match then record a mapping between the event Ids
-                    .ifPresent(onmsSyslog -> cpnEventIdToOnmsEventId.put(cpnSyslog.getId(),
-                            Integer.parseInt(onmsSyslog.getId())));
+                    .ifPresent(onmsSyslog -> {
+                        Integer onmsId = Integer.parseInt(onmsSyslog.getId());
+                        cpnEventIdToOnmsEventId.put(cpnSyslog.getId(), onmsId);
+                        alreadyMatchedOnmsEvents.add(onmsId);
+                    });
         }
 
         return Collections.unmodifiableMap(cpnEventIdToOnmsEventId);
     }
 
-    private static List<ESEventDTO> filterMatchesForTrap(MatchingTrapEventRecord cpnTrap, List<ESEventDTO> potentialMatches) {
+    private static List<ESEventDTO> filterMatchesForTrap(MatchingTrapEventRecord cpnTrap,
+                                                         List<ESEventDTO> potentialMatches) {
         if (oid2str(OnmsSnmpConstants.linkDown).equals(cpnTrap.getTrapTypeOid()) ||
                 oid2str(OnmsSnmpConstants.linkUp).equals(cpnTrap.getTrapTypeOid())) {
             // We know we a link up/down trap, extract the port from the location
@@ -104,13 +113,19 @@ public class EventMatcher {
             List<ESEventDTO> potentialMatches = onmsTrapsByType.get(type);
 
             if (potentialMatches != null) {
+                // Remove any Onms events that have already been paired so we don't pair them twice
+                potentialMatches.removeIf(potential -> alreadyMatchedOnmsEvents.contains(potential.getId()));
+
                 for (MatchingTrapEventRecord cpnTrap : cpnTrapsForOid) {
                     // Refine the potential matches for this specific instance of the trap
                     List<ESEventDTO> refinedPotentialMatches = filterMatchesForTrap(cpnTrap, potentialMatches);
 
                     // Find the closest matching event (by time delta) within the allowed time range
                     timeWindowSearch(cpnTrap.getTime().getTime(), refinedPotentialMatches)
-                            .ifPresent(id -> cpnEventIdToOnmsEventId.put(cpnTrap.getEventId(), id));
+                            .ifPresent(id -> {
+                                cpnEventIdToOnmsEventId.put(cpnTrap.getEventId(), id);
+                                alreadyMatchedOnmsEvents.add(id);
+                            });
                 }
             }
         }
@@ -140,7 +155,8 @@ public class EventMatcher {
         return genericSyslogMessages;
     }
 
-    private static Map<String, List<MatchingTrapEventRecord>> groupCpnTrapsByType(List<? extends MatchingTrapEventRecord> cpnTraps) {
+    private static Map<String, List<MatchingTrapEventRecord>> groupCpnTrapsByType(List<?
+            extends MatchingTrapEventRecord> cpnTraps) {
         Map<String, List<MatchingTrapEventRecord>> cpnTrapsByType = new HashMap<>();
 
         for (MatchingTrapEventRecord cpnTrap : cpnTraps) {
@@ -219,204 +235,6 @@ public class EventMatcher {
         }
 
         return match;
-    }
-
-    // TODO: The below code is for handling the case of lists of events that haven't been scoped by host yet
-    // Not sure if this is still needed, if not the below can be deleted
-    
-    // TODO: Untested, we can probably remove this if we always plan on scoping by host
-    public static Map<String, Integer> matchSyslogEventsScopedByTime(List<MatchingSyslogEventRecord> cpnSyslogs,
-                                                                     List<ESEventDTO> onmsSyslogs)
-            throws ExecutionException, InterruptedException {
-        // Group the syslogs by node
-        Map<String, List<GenericSyslogMessage>> cpnSyslogsByHost = groupCpnSyslogsByHostAndType(cpnSyslogs);
-        Map<String, List<GenericSyslogMessage>> onmsSyslogsByHost = groupOnmsSyslogsByHostAndType(onmsSyslogs);
-
-        Map<String, Integer> cpnEventIdToOnmsEventId = new HashMap<>();
-
-        // Iterate through each list of syslogs by host
-        for (Map.Entry<String, List<GenericSyslogMessage>> cpnEntry : cpnSyslogsByHost.entrySet()) {
-            String host = cpnEntry.getKey();
-            List<GenericSyslogMessage> cpnSyslogsForhost = cpnEntry.getValue();
-            // Find the potential matches by looking up all the Onms syslogs for the same host
-            List<GenericSyslogMessage> potentialOnmsMatches = onmsSyslogsByHost.get(host);
-
-            if (potentialOnmsMatches != null) {
-                // Iterate through the syslogs for this host
-                for (GenericSyslogMessage cpnSyslog : cpnSyslogsForhost) {
-                    potentialOnmsMatches.stream()
-                            .filter(cpnSyslog::equals)
-                            .findAny()
-                            // If we found a match then record a mapping between the event Ids
-                            .ifPresent(onmsSyslog -> cpnEventIdToOnmsEventId.put(cpnSyslog.getId(),
-                                    Integer.parseInt(onmsSyslog.getId())));
-                }
-            }
-        }
-
-        return Collections.unmodifiableMap(cpnEventIdToOnmsEventId);
-    }
-
-    // TODO: Untested, we can probably remove this if we always plan on scoping by host
-    public static Map<String, Integer> matchTrapEventsScopedByTime(List<MatchingTrapEventRecord> cpnTraps,
-                                                                   List<ESEventDTO> onmsTraps) {
-        // Group the traps by node and sort them by time
-        Map<String, Map<String, List<MatchingTrapEventRecord>>> cpnTrapsByHost = groupCpnTrapsByHostAndType(cpnTraps);
-        Map<String, Map<String, List<ESEventDTO>>> onmsTrapsByHost = gorupOnmsTrapsByHostAndType(onmsTraps);
-
-        Map<String, Integer> cpnEventIdToOnmsEventId = new HashMap<>();
-
-        // Iterate through each list of traps by host
-        for (Map.Entry<String, Map<String, List<MatchingTrapEventRecord>>> cpnEntry : cpnTrapsByHost.entrySet()) {
-            String host = cpnEntry.getKey();
-
-            for (Map.Entry<String, List<MatchingTrapEventRecord>> cpnTrapsForHostByOid :
-                    cpnEntry.getValue().entrySet()) {
-                List<MatchingTrapEventRecord> cpnSyslogsForHostAndOid = cpnTrapsForHostByOid.getValue();
-                // Find the potential matches by looking up all the Onms traps for the same host
-                Map<String, List<ESEventDTO>> hostMap = onmsTrapsByHost.get(host);
-
-                if (hostMap != null) {
-                    for (MatchingTrapEventRecord cpnTrap : cpnSyslogsForHostAndOid) {
-                        List<ESEventDTO> potentialOnmsMatches = hostMap.get(cpnTrap.getTrapTypeOid());
-
-                        if (potentialOnmsMatches != null) {
-                            // Iterate through the traps for this host
-
-                            // Find the closest matching event (by time delta) within the allowed time range
-                            timeWindowSearch(cpnTrap.getTime().getTime(), potentialOnmsMatches)
-                                    .ifPresent(id -> cpnEventIdToOnmsEventId.put(cpnTrap.getEventId(), id));
-                        }
-                    }
-                }
-            }
-        }
-
-        return Collections.unmodifiableMap(cpnEventIdToOnmsEventId);
-    }
-
-    // TODO: Untested, we can probably remove this if we always plan on scoping by host
-    private static void mapSyslog(GenericSyslogMessage syslogMessage, Map<String, List<GenericSyslogMessage>> map) {
-        map.compute(syslogMessage.getHost(), (host, current) -> {
-            if (current == null) {
-                List<GenericSyslogMessage> syslogsForHost = new ArrayList<>();
-                syslogsForHost.add(syslogMessage);
-
-                return syslogsForHost;
-            }
-
-            current.add(syslogMessage);
-
-            return current;
-        });
-    }
-
-    // TODO: Untested, we can probably remove this if we always plan on scoping by host
-    private static Map<String, List<GenericSyslogMessage>> groupCpnSyslogsByHostAndType(List<MatchingSyslogEventRecord> cpnSyslogs) throws ExecutionException, InterruptedException {
-        Map<String, List<GenericSyslogMessage>> cpnSyslogsByHost = new HashMap<>();
-
-        for (MatchingSyslogEventRecord cpnSyslogEvent : cpnSyslogs) {
-            GenericSyslogMessage genericSyslogMessage = GenericSyslogMessage.fromCpn(cpnSyslogEvent.getEventId(),
-                    EventUtils.getNodeLabelFromLocation(cpnSyslogEvent.getLocation()),
-                    cpnSyslogEvent.getDetailedDescription());
-            mapSyslog(genericSyslogMessage, cpnSyslogsByHost);
-        }
-
-        return cpnSyslogsByHost;
-    }
-
-    // TODO: Untested, we can probably remove this if we always plan on scoping by host
-    private static Map<String, List<GenericSyslogMessage>> groupOnmsSyslogsByHostAndType(List<ESEventDTO> onmsSyslogs) {
-        Map<String, List<GenericSyslogMessage>> onmsSylsogsByHost = new HashMap<>();
-
-        for (ESEventDTO onmsSyslogEvent : onmsSyslogs) {
-            GenericSyslogMessage genericSyslogMessage = GenericSyslogMessage.fromOnms(onmsSyslogEvent.getId(),
-                    onmsSyslogEvent.getNodeLabel(),
-                    onmsSyslogEvent.getSyslogMessage(), onmsSyslogEvent.getTimestamp());
-            mapSyslog(genericSyslogMessage, onmsSylsogsByHost);
-        }
-
-        return onmsSylsogsByHost;
-    }
-
-    // TODO: Untested, we can probably remove this if we always plan on scoping by host
-    private static Map<String, Map<String, List<MatchingTrapEventRecord>>> groupCpnTrapsByHostAndType(List<MatchingTrapEventRecord> cpnTraps) {
-        Map<String, Map<String, List<MatchingTrapEventRecord>>> cpnTrapsByHost = new HashMap<>();
-
-        for (MatchingTrapEventRecord cpnTrap : cpnTraps) {
-            cpnTrapsByHost.compute(EventUtils.getNodeLabelFromLocation(cpnTrap.getLocation()), (host, currentMap) -> {
-                if (currentMap == null) {
-                    Map<String, List<MatchingTrapEventRecord>> trapsForhost = new HashMap<>();
-                    List<MatchingTrapEventRecord> trapsForOid = new ArrayList<>();
-                    trapsForOid.add(cpnTrap);
-                    trapsForhost.put(cpnTrap.getTrapTypeOid(), trapsForOid);
-
-                    return trapsForhost;
-                }
-
-                currentMap.compute(cpnTrap.getTrapTypeOid(), (oid, currentTraps) -> {
-                    if (currentTraps == null) {
-                        List<MatchingTrapEventRecord> trapsForOid = new ArrayList<>();
-                        trapsForOid.add(cpnTrap);
-
-                        return trapsForOid;
-                    }
-
-                    currentTraps.add(cpnTrap);
-
-                    return currentTraps;
-                });
-
-                return currentMap;
-            });
-        }
-
-        return cpnTrapsByHost;
-    }
-
-    // TODO: Untested, we can probably remove this if we always plan on scoping by host
-    private static Map<String, Map<String, List<ESEventDTO>>> gorupOnmsTrapsByHostAndType(List<ESEventDTO> onmsTraps) {
-        Map<String, Map<String, List<ESEventDTO>>> onmsTrapsByHost = new HashMap<>();
-
-        for (ESEventDTO onmsTrap : onmsTraps) {
-            String trapTypeOidForTrap;
-
-            if (!onmsTrap.getTrapTypeOid().isPresent()) {
-                // If this trap does not have a trap type then we will ignore it
-                continue;
-            }
-
-            trapTypeOidForTrap = onmsTrap.getTrapTypeOid().get();
-
-            onmsTrapsByHost.compute(onmsTrap.getNodeLabel(), (host, currentMap) -> {
-                if (currentMap == null) {
-                    Map<String, List<ESEventDTO>> trapsForhost = new HashMap<>();
-                    List<ESEventDTO> trapsForOid = new ArrayList<>();
-                    trapsForOid.add(onmsTrap);
-                    trapsForOid.sort(Comparator.comparingLong(trap -> trap.getTimestamp().getTime()));
-                    trapsForhost.put(trapTypeOidForTrap, trapsForOid);
-
-                    return trapsForhost;
-                }
-
-                currentMap.compute(trapTypeOidForTrap, (oid, currentTraps) -> {
-                    if (currentTraps == null) {
-                        List<ESEventDTO> trapsForOid = new ArrayList<>();
-                        trapsForOid.add(onmsTrap);
-
-                        return trapsForOid;
-                    }
-
-                    currentTraps.add(onmsTrap);
-
-                    return currentTraps;
-                });
-
-                return currentMap;
-            });
-        }
-
-        return onmsTrapsByHost;
     }
 
     private static String oid2str(OID oid) {
