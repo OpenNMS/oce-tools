@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+import org.junit.Before;
 import org.junit.Test;
 import org.opennms.oce.tools.cpn.events.MatchingSyslogEventRecord;
 import org.opennms.oce.tools.cpn.events.MatchingTrapEventRecord;
@@ -46,6 +47,11 @@ import org.opennms.oce.tools.onms.client.ESEventDTO;
 
 public class EventMatcherTest {
 
+    @Before
+    public void clean() {
+        EventMatcher.alreadyMatchedOnmsEvents.clear();
+    }
+    
     @Test
     public void canMatchLinkDownTraps() {
         List<MatchingTrapEventRecord> cpnTraps = new ArrayList<>();
@@ -142,6 +148,35 @@ public class EventMatcherTest {
 
         Map<String, Integer> results = EventMatcher.matchSyslogEventsScopedByTimeAndHost(cpnSyslogs, onmsSyslogs);
         // only one should have matched since we don't allow matching the same Onms event to multiple cpn events
+        assertThat(results.values(), hasSize(1));
+    }
+
+    @Test
+    public void canMatchSyslogsWithFuzzedDate() throws ExecutionException, InterruptedException {
+        List<MatchingSyslogEventRecord> cpnSyslogs = new ArrayList<>();
+        List<ESEventDTO> onmsSyslogs = new ArrayList<>();
+
+        String syslogMsg1Header = "<188>123456: Jul 17 04:36:01.993: ";
+        String syslogMsg1Body = "%CDP-4-NATIVE_VLAN_MISMATCH: Native VLAN mismatch " +
+                "discovered on GigabitEthernet0/43 (503), with Switch GigabitEthernet1/0/24 (1).";
+        String syslogMsg1 = syslogMsg1Header + syslogMsg1Body;
+        String host1 = "testhost";
+
+        String cpnEventId1 = "1";
+        MatchingSyslogEventRecord s1 = new MatchingSyslogEventRecordImpl(cpnEventId1, syslogMsg1, host1);
+
+        ESEventDTO e1 = new ESEventDTO();
+        Integer onmsEventId = 101;
+        e1.setId(onmsEventId);
+        e1.setNodeLabel(host1);
+        e1.setSyslogMessage(syslogMsg1Body);
+        // Set the date off by the max fuzz interval rather than a precise match
+        e1.setTimestamp(new Date(SyslogParser.parse(syslogMsg1).getDate().getTime() + EventMatcher.syslogDateFuzzMs));
+
+        cpnSyslogs.add(s1);
+        onmsSyslogs.add(e1);
+
+        Map<String, Integer> results = EventMatcher.matchSyslogEventsScopedByTimeAndHost(cpnSyslogs, onmsSyslogs);
         assertThat(results.values(), hasSize(1));
     }
 

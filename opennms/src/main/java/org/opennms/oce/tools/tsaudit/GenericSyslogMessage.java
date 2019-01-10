@@ -99,12 +99,17 @@ public class GenericSyslogMessage {
                 Objects.equals(date, that.date);
     }
 
-    public boolean equalsIgnoringHost(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        GenericSyslogMessage that = (GenericSyslogMessage) o;
-        return Objects.equals(message, that.message) &&
-                Objects.equals(date, that.date);
+    public boolean equalsIgnoringHost(GenericSyslogMessage other) {
+        if (this == other) return true;
+        return Objects.equals(message, other.message) &&
+                Objects.equals(date, other.date);
+    }
+
+    public boolean equalsIgnoringHostFuzzyDate(GenericSyslogMessage other, long timeDeltaAllowedMs) {
+        if (this == other) return true;
+        return Objects.equals(message, other.message) &&
+                date.getTime() >= (other.date.getTime() - timeDeltaAllowedMs) &&
+                date.getTime() <= (other.date.getTime() + timeDeltaAllowedMs);
     }
 
     @Override

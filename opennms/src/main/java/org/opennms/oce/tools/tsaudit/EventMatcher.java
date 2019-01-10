@@ -30,7 +30,6 @@ package org.opennms.oce.tools.tsaudit;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -39,6 +38,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.opennms.oce.tools.cpn.EventUtils;
@@ -50,9 +50,14 @@ import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.model.v1.OnmsSnmpConstants;
 import org.snmp4j.smi.OID;
 
+import com.google.common.annotations.VisibleForTesting;
+
 public class EventMatcher {
     private static final long timeDeltaAllowedMs = TimeUnit.MILLISECONDS.convert(120, TimeUnit.SECONDS);
-    private static final Set<Integer> alreadyMatchedOnmsEvents = new HashSet<>();
+    @VisibleForTesting
+    static final long syslogDateFuzzMs = TimeUnit.MILLISECONDS.convert(1, TimeUnit.SECONDS);
+    @VisibleForTesting
+    static final Set<Integer> alreadyMatchedOnmsEvents = new HashSet<>();
 
     public static Map<String, Integer> matchSyslogEventsScopedByTimeAndHost(List<? extends MatchingSyslogEventRecord> cpnSyslogs, List<ESEventDTO> onmsSyslogs)
             throws ExecutionException, InterruptedException {
@@ -61,9 +66,12 @@ public class EventMatcher {
         List<GenericSyslogMessage> genericOnmsSyslogs = mapSyslogMessagesFromOnms(onmsSyslogs);
 
         Map<String, Integer> cpnEventIdToOnmsEventId = new HashMap<>();
+        AtomicBoolean foundMatch = new AtomicBoolean();
 
         // Iterate through each list of syslogs
         for (GenericSyslogMessage cpnSyslog : genericCpnSyslogs) {
+            foundMatch.set(false);
+
             genericOnmsSyslogs.stream()
                     .filter(candidateSyslog ->
                             !alreadyMatchedOnmsEvents.contains(Integer.parseInt(candidateSyslog.getId())) &&
@@ -74,7 +82,23 @@ public class EventMatcher {
                         Integer onmsId = Integer.parseInt(onmsSyslog.getId());
                         cpnEventIdToOnmsEventId.put(cpnSyslog.getId(), onmsId);
                         alreadyMatchedOnmsEvents.add(onmsId);
+                        foundMatch.set(true);
                     });
+
+            // If we didn't find the event using an exact matching strategy, try allowing for some time delta
+            if (!foundMatch.get()) {
+                genericOnmsSyslogs.stream()
+                        .filter(candidateSyslog ->
+                                !alreadyMatchedOnmsEvents.contains(Integer.parseInt(candidateSyslog.getId())) &&
+                                        cpnSyslog.equalsIgnoringHostFuzzyDate(candidateSyslog, syslogDateFuzzMs))
+                        .findAny()
+                        // If we found a match then record a mapping between the event Ids
+                        .ifPresent(onmsSyslog -> {
+                            Integer onmsId = Integer.parseInt(onmsSyslog.getId());
+                            cpnEventIdToOnmsEventId.put(cpnSyslog.getId(), onmsId);
+                            alreadyMatchedOnmsEvents.add(onmsId);
+                        });
+            }
         }
 
         return Collections.unmodifiableMap(cpnEventIdToOnmsEventId);
