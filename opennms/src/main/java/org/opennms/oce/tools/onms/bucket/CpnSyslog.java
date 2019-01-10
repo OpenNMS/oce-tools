@@ -14,15 +14,12 @@ public class CpnSyslog {
 
     private final String detailedDescription;
 
-    private final long time;
-
     private String message;
 
     private Date date;
 
     public CpnSyslog(EventRecord r) {
         detailedDescription = r.getDetailedDescription();
-        time = r.getTime().getTime();
         SyslogMessage syslogMessage;
         try {
             syslogMessage = SyslogParser.parse(detailedDescription);
@@ -45,12 +42,17 @@ public class CpnSyslog {
         return syslogs.stream().anyMatch(s -> matches(s));
     }
 
-    @Override
-    public String toString() {
-        return "Syslog[" + time + "|" + detailedDescription + "]";
-    }
-
     public String getMessage() {
         return message;
     }
+
+    public Date getDate() {
+        return date;
+    }
+
+    @Override
+    public String toString() {
+        return "Syslog[" + date + "|" + message + "]";
+    }
+
 }

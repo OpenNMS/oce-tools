@@ -155,7 +155,7 @@ public class Buckets {
                         node.removeMatchableSituation(s);
                         break;
                     }
-                    if (t.partiallymatches(s)) {
+                    if (t.partiallyMatches(s)) {
                         partialMatches.add(new Match(t, s));
                         ticketIsUnmatched = false;
                         node.removeMatchableSituation(s);
@@ -201,8 +201,14 @@ public class Buckets {
 
     private static void printPartialMatch(Match m) {
         System.out.println("Partial Match:");
+
         System.out.println(m.t);
+        m.t.getSyslogs().stream().forEach(s -> LOG.info("   " + s.toString()));
+        m.t.getTraps().stream().forEach(t -> LOG.info("   " + t.toString()));
         System.out.println(m.s);
+        m.s.getSyslogs().stream().sorted((s1, s2) -> s1.getDate().compareTo(s2.getDate())).forEach(s -> LOG.info("   " + s.toString()));
+        m.s.getTraps().stream().sorted((s1, s2) -> s1.getDate().compareTo(s2.getDate())).forEach(t -> LOG.info("   " + t.toString()));
+
         System.out.println("-----");
     }
 
