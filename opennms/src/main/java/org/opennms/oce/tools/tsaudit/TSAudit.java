@@ -250,9 +250,9 @@ public class TSAudit {
         final Map<Integer, List<AlarmDocumentDTO>> situationsById = allSituationDtos.stream()
                 .collect(groupingBy(AlarmDocumentDTO::getId));
 
-        // Group the alarms by reduction key
-        final Map<String, List<AlarmDocumentDTO>> alarmsByReductionKey = alarmDtos.stream()
-                .collect(groupingBy(AlarmDocumentDTO::getReductionKey));
+        // Group the alarms by alarm id
+        final Map<Integer, List<AlarmDocumentDTO>> alarmsByReductionKey = alarmDtos.stream()
+                .collect(groupingBy(AlarmDocumentDTO::getId));
 
         // Group the events by reduction key
         final Map<String, List<ESEventDTO>> eventsByReductionKey = nodeAndEvents.getOnmsEvents().stream()
@@ -267,25 +267,29 @@ public class TSAudit {
         final List<SituationAndEvents> situationsAndEvents = new LinkedList<>();
         for (List<AlarmDocumentDTO> situationDtos : situationsById.values()) {
             final String situationReductionKey = situationDtos.get(0).getReductionKey();
-            // Gather all of the related reduction keys
-            final Set<String> relatedReductionKeys = situationDtos.stream()
-                    .flatMap(s -> s.getRelatedAlarmReductionKeys().stream())
+            // Gather all of the related alarm ids
+            final Set<Integer> relatedAlarmIds = situationDtos.stream()
+                    .flatMap(s -> s.getRelatedAlarmIds().stream())
                     .collect(Collectors.toSet());
 
             // Gather the events in the related alarms
             boolean didFindAlarmDocumentsForAtLeaseOneRelatedAlarm = false;
             final List<ESEventDTO> allEventsInSituation = new LinkedList<>();
-            for (String relatedReductionKey : relatedReductionKeys) {
+            for (Integer relatedAlarmId : relatedAlarmIds) {
                 // For every related alarm, determine it's lifespan
-                final List<AlarmDocumentDTO> relatedAlarmDtos = alarmsByReductionKey.getOrDefault(relatedReductionKey, Collections.emptyList());
+                final List<AlarmDocumentDTO> relatedAlarmDtos = alarmsByReductionKey.getOrDefault(relatedAlarmId, Collections.emptyList());
                 if (relatedAlarmDtos.isEmpty()) {
-                    LOG.warn("No alarms documents found for related reduction key: {} on situation with reduction key: {}",
-                            relatedReductionKey, situationReductionKey);
+                    LOG.warn("No alarms documents found for related alarm id: {} on situation with reduction key: {}",
+                            relatedAlarmId, situationReductionKey);
 
                     // No events to gather here
                     continue;
                 }
                 didFindAlarmDocumentsForAtLeaseOneRelatedAlarm = true;
+
+                // Grab the reduction key from the first document, it must be the same on the remainder of
+                // the documents for the same id
+                final String relatedReductionKey = relatedAlarmDtos.iterator().next().getReductionKey();
 
                 // Now find events that relate to this reduction key in the computed lifespan
                 final Lifespan alarmLifespan = getLifespan(relatedAlarmDtos, startMs, endMs);
