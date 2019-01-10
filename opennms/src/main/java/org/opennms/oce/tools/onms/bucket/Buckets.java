@@ -124,12 +124,11 @@ public class Buckets {
         return location;
     }
 
+    // Attempt to match all of the Tickets on the Node during the time window.
     private void parseNodes(Collection<Node> nodes, ZonedDateTime start, ZonedDateTime end) {
         // TODO - sort chrono Tickets and Situations
-        // TODO - only search a small sliding window of time
         // TODO - remove matched situations from SituationSet
         for (Node node : nodes) {
-            // Populate the Situations we will consider
             for (Ticket t : node.getTickets()) {
                 LOG.debug("Attempting to match TICKET {}", t.getId());
                 try {
@@ -248,9 +247,9 @@ public class Buckets {
         }
         // retrieve the related events and add them to the situations
         for (Situation s : situations.values()) {
-            List<Integer> eventIds = s.getRelatedAlarms().stream().map(Alarm::getLastEventId).filter(Objects::nonNull).collect(Collectors.toList());
+            List<Integer> eventIds = s.getRelatedAlarms().stream().flatMap(a -> a.getEventIds().stream()).filter(Objects::nonNull).collect(Collectors.toList());
             Set<Integer> cacheHits = new HashSet<>();
-            for (Integer id : s.getRelatedAlarms().stream().map(Alarm::getLastEventId).filter(Objects::nonNull).collect(Collectors.toList())) {
+            for (Integer id : eventIds) {
                 if (cache.hasEvent(id)) {
                     s.setEvent(cache.getEventDto(id));
                     cacheHits.add(id);

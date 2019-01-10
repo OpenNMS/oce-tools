@@ -26,8 +26,9 @@ public class Alarm {
         start = dto.getFirstEventTime() == null ? 0 : dto.getFirstEventTime();
         end = dto.getLastEventTime() == null ? 0 : dto.getLastEventTime();
         isDeleted = dto.getDeletedTime() != null;
-        if (dto.getLastEvent() != null) {
+        if (dto.getLastEvent() != null && dto.getLastEvent().getId() != null) {
             lastEventId = dto.getLastEvent().getId();
+            eventIds.add(lastEventId);
         }
     }
 
