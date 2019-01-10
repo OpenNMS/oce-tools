@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -127,8 +128,8 @@ public class Buckets {
     // Attempt to match all of the Tickets on the Node during the time window.
     private void parseNodes(Collection<Node> nodes, ZonedDateTime start, ZonedDateTime end) {
         // TODO - sort chrono Tickets and Situations
-        // TODO - remove matched situations from SituationSet
         for (Node node : nodes) {
+            node.setMatchableSituations(node.getSituations());
             for (Ticket t : node.getTickets()) {
                 LOG.debug("Attempting to match TICKET {}", t.getId());
                 try {
@@ -140,15 +141,18 @@ public class Buckets {
                 }
                 boolean ticketIsUnmatched = true;
                 //
-                for (Situation s : node.getSituations()) {
+                for (Iterator<Situation> iterator = node.getMatchableSituations().iterator(); iterator.hasNext();) {
+                    Situation s = iterator.next();
                     if (t.matches(s)) {
                         matches.add(new Match(t, s));
                         ticketIsUnmatched = false;
+                        node.removeMatchableSituation(s);
                         break;
                     }
                     if (t.partiallymatches(s)) {
                         partialMatches.add(new Match(t, s));
                         ticketIsUnmatched = false;
+                        node.removeMatchableSituation(s);
                         break;
                     }
                 }

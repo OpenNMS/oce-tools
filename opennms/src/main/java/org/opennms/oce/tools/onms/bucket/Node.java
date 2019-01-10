@@ -23,6 +23,9 @@ public class Node {
     // ONMS DATA
     private final Set<Situation> situations = new HashSet<>();
 
+    // Runtime set of Situations that have not yet been matched
+    private final Set<Situation> matchableSituations = new HashSet<>();
+
     public String getCpnHostname() {
         return cpnHostname;
     }
@@ -33,6 +36,19 @@ public class Node {
 
     public String getOnmsNodeLabel() {
         return onmsNodeLabel;
+    }
+
+    public Set<Situation> getMatchableSituations() {
+        return matchableSituations;
+    }
+
+    public void setMatchableSituations(Set<Situation> situations) {
+        matchableSituations.clear();
+        matchableSituations.addAll(situations);
+    }
+
+    public boolean removeMatchableSituation(Situation situation) {
+        return matchableSituations.remove(situation);
     }
 
     public Set<Situation> getSituations() {
