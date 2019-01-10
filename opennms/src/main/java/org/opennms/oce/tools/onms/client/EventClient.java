@@ -235,8 +235,8 @@ public class EventClient {
     public List<AlarmDocumentDTO> getSituationsForHostname(long startMs, long endMs, String hostname) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.boolQuery()
-                .must(termQuery("situation", "true"))
                 .must(matchPhraseQuery("node.label", hostname))
+                .must(termQuery("situation", "true"))
                 .must(rangeQuery("@update_time").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
         final Search search = new Search.Builder(searchSourceBuilder.toString())
                 .setParameter(Parameters.SCROLL, "5m")
@@ -263,14 +263,16 @@ public class EventClient {
         return situations;
     }
 
-    public List<AlarmDocumentDTO> getAlarmsByIds(List<Integer> alarmIds) throws IOException {
+    public List<AlarmDocumentDTO> getAlarmsByIds(List<Integer> alarmIds, long startMs, long endMs) throws IOException {
         if (alarmIds == null || alarmIds.isEmpty()) {
             return Collections.emptyList();
         }
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         final TermsQueryBuilder termQuery = new TermsQueryBuilder("id", alarmIds.stream().mapToInt(i -> i).toArray());
-        searchSourceBuilder.query(termQuery);
+        searchSourceBuilder.query(QueryBuilders.boolQuery()
+            .must(termQuery)
+            .must(rangeQuery("@update_time").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
         final Search search = new Search.Builder(searchSourceBuilder.toString())
                 .setParameter(Parameters.SCROLL, "5m")
                 .build();

@@ -43,12 +43,6 @@ public class Node {
         return tickets;
     }
 
-    public void setOnmsData(OnmsData onmsData) {
-        // TODO Auto-generated method stub
-        // Add ONMS data to this node -
-        // FIXME onmsData.getSituations.stream().filter(s -> s.getNode());
-    }
-
     public void setOnmsNodeId(int onmsNodeId) {
         this.onmsNodeId = onmsNodeId;
     }
@@ -73,4 +67,8 @@ public class Node {
         tickets.add(ticket);
     }
 
+    @Override
+    public String toString() {
+        return "Node[" + onmsNodeId + "|" + cpnHostname + "]";
+    }
 }

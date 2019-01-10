@@ -2,9 +2,12 @@ package org.opennms.oce.tools.onms.bucket;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
@@ -26,6 +29,8 @@ public class Situation {
     private final Set<String> relatedAlarmReductionKeys = new HashSet<>();
 
     private final Set<AlarmDocumentDTO> relatedAlarmDtos = new HashSet<>();
+
+    private final Map<Integer, Alarm> alarms = new HashMap<>();
 
     public Situation(AlarmDocumentDTO dto) {
         id = dto.getId();
@@ -82,7 +87,7 @@ public class Situation {
 
     @Override
     public String toString() {
-        return "Situation[" + id + "|\n" + syslogs + "\n" + traps + "]";
+        return "Situation[" + id + "|\n" + alarms.values().stream().map(Alarm::toString).collect(Collectors.joining("\n")) + "]";
     }
 
     public void addRelatedAlarmIds(Set<Integer> relatedAlarmIds) {
@@ -90,10 +95,13 @@ public class Situation {
     }
 
     public void addRelatedAlarmDtos(List<AlarmDocumentDTO> relatedAlarmDtos) {
+        LOG.debug("{} alarm DTOs reduced to {} Alarms for Situation {}.", relatedAlarmDtos.size(), alarms.size(), id);
         this.relatedAlarmDtos.addAll(relatedAlarmDtos);
         for (AlarmDocumentDTO dto : relatedAlarmDtos) {
-
+            alarms.computeIfAbsent(dto.getId(), k -> new Alarm(dto));
+            alarms.get(dto.getId()).update(dto);
         }
+        LOG.debug("{} alarm DTOs reduced to {} Alarms for Situation {}.", relatedAlarmDtos.size(), alarms.size(), id);
     }
 
     public Set<AlarmDocumentDTO> getRelatedAlarmDtos() {

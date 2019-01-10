@@ -67,7 +67,7 @@ public class Ticket {
 
     @Override
     public String toString() {
-        return "Ticket[" + id + "]:\n" + syslogs + "\n" + traps;
+        return "Ticket[" + id + "]";
     }
 
 }
