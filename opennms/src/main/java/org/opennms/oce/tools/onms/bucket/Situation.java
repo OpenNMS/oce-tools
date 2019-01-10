@@ -57,15 +57,17 @@ public class Situation {
     }
 
     public void setEvents(Collection<ESEventDTO> events) {
+        events.forEach(e -> setEvent(e));
+    }
+
+    public void setEvent(ESEventDTO dto) {
         // FIXME --- convert each event to syslog or trap and add to stack
-        for (ESEventDTO dto : events) {
-            if (dto.getSyslogMessage() != null) {
-                LOG.debug("Situation [{}] - Event [{}] : THIS IS A SYSLOG: {}", id, dto.getId(), dto.getSyslogMessage());
-                syslogs.add(new OnmsSyslog(dto));
-            } else {
-                LOG.debug("Situation [{}] - Event [{}] : THIS IS A TRAP: {}", id, dto.getId(), dto.getTrapTypeOid());
-                traps.add(new OnmsTrap(dto));
-            }
+        if (dto.getSyslogMessage() != null) {
+            LOG.debug("Situation [{}] - Event [{}] : THIS IS A SYSLOG: {}", id, dto.getId(), dto.getSyslogMessage());
+            syslogs.add(new OnmsSyslog(dto));
+        } else {
+            LOG.debug("Situation [{}] - Event [{}] : THIS IS A TRAP: {}", id, dto.getId(), dto.getTrapTypeOid());
+            traps.add(new OnmsTrap(dto));
         }
     }
 
@@ -94,14 +96,25 @@ public class Situation {
         this.relatedAlarmIds.addAll(relatedAlarmIds);
     }
 
+    public void addRelatedAlarm(Alarm alarm) {
+        alarms.computeIfAbsent(alarm.getId(), k -> alarm);
+    }
+
     public void addRelatedAlarmDtos(List<AlarmDocumentDTO> relatedAlarmDtos) {
-        LOG.debug("{} alarm DTOs reduced to {} Alarms for Situation {}.", relatedAlarmDtos.size(), alarms.size(), id);
+        if (relatedAlarmDtos.isEmpty()) {
+            LOG.debug("No Alarm DTOs retrived for Situation {}.", id);
+            return;
+        }
         this.relatedAlarmDtos.addAll(relatedAlarmDtos);
         for (AlarmDocumentDTO dto : relatedAlarmDtos) {
             alarms.computeIfAbsent(dto.getId(), k -> new Alarm(dto));
             alarms.get(dto.getId()).update(dto);
         }
         LOG.debug("{} alarm DTOs reduced to {} Alarms for Situation {}.", relatedAlarmDtos.size(), alarms.size(), id);
+    }
+
+    public Collection<Alarm> getRelatedAlarms() {
+        return alarms.values();
     }
 
     public Set<AlarmDocumentDTO> getRelatedAlarmDtos() {

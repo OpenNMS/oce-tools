@@ -15,6 +15,8 @@ public class Alarm {
 
     private Long end;
 
+    private Integer lastEventId;
+
     private final Set<Integer> eventIds = new HashSet<>();
 
     private boolean isDeleted;
@@ -24,6 +26,9 @@ public class Alarm {
         start = dto.getFirstEventTime() == null ? 0 : dto.getFirstEventTime();
         end = dto.getLastEventTime() == null ? 0 : dto.getLastEventTime();
         isDeleted = dto.getDeletedTime() != null;
+        if (dto.getLastEvent() != null) {
+            lastEventId = dto.getLastEvent().getId();
+        }
     }
 
     public int getId() {
@@ -42,6 +47,10 @@ public class Alarm {
         return isDeleted;
     }
 
+    public Integer getLastEventId() {
+        return lastEventId;
+    }
+
     public List<Integer> getEventIds() {
         return eventIds.stream().collect(Collectors.toList());
     }
@@ -56,6 +65,10 @@ public class Alarm {
         }
         if (dto.getLastEventTime() != null && dto.getLastEventTime() > end) {
             end = dto.getLastEventTime();
+            // set this as the last event
+            if (dto.getLastEvent() != null) {
+                lastEventId = dto.getLastEvent().getId();
+            }
         }
         if (dto.getDeletedTime() != null) {
         isDeleted = true;

@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -46,6 +47,8 @@ public class Buckets {
 
     private Map<String, Node> nodesByName;
     private final ESDataProvider esDataProvider;
+
+    private final ObjectCache cache = new ObjectCache();
 
     public Buckets(ESDataProvider esDataProvider) {
         this.esDataProvider = Objects.requireNonNull(esDataProvider);
@@ -224,23 +227,36 @@ public class Buckets {
         LOG.debug("{} Situations DTOs reduced to {} Situations.", situationDtos.size(), situations.size());
         // Retrieve Alarms for each situation, reducing Alarm Documents as above.
         for (Situation s : situations.values()) {
+            LOG.debug("Populating Situation {} ", s.getId());
+            // Try the cache and retrieve relatedAlarmIds that are cache misses.
+            Set<Integer> cacheHits = new HashSet<>();
+            for (Integer id : s.getRelatedAlarmIds()) {
+                if (cache.hasAlarm(id)) {
+                    s.addRelatedAlarm(cache.getAlarm(id));
+                    cacheHits.add(id);
+                }
+            }
             try {
-                s.addRelatedAlarmDtos(eventClient.getAlarmsByIds(s.getRelatedAlarmIds().stream().collect(Collectors.toList()), 
+                // retrieve cache misses from ES.
+                s.addRelatedAlarmDtos(eventClient.getAlarmsByIds(s.getRelatedAlarmIds().stream().filter(id -> !cacheHits.contains(id)).collect(Collectors.toList()),
                                                                  start.toInstant().toEpochMilli(), 
                                                                  end.toInstant().toEpochMilli()));
             } catch (IOException e) {
                 LOG.warn("Error retrieving ALARMS for Situation {} : {} ", s, e.getMessage());
             }
+            cache.cacheAlarms(s.getRelatedAlarms());
         }
         // retrieve the related events and add them to the situations
         for (Situation s : situations.values()) {
-            List<ESEventDTO> events = getEventsForAlarms(s.getRelatedAlarmDtos().stream()
-                                                             .map(AlarmDocumentDTO::getLastEvent)
-                                                             .filter(Objects::nonNull)
-                                                             .map(EventDocumentDTO::getId)
-                                                             .filter(Objects::nonNull)
-                                                             .collect(Collectors.toList()));
-            s.setEvents(events);
+            List<Integer> eventIds = s.getRelatedAlarms().stream().map(Alarm::getLastEventId).filter(Objects::nonNull).collect(Collectors.toList());
+            Set<Integer> cacheHits = new HashSet<>();
+            for (Integer id : s.getRelatedAlarms().stream().map(Alarm::getLastEventId).filter(Objects::nonNull).collect(Collectors.toList())) {
+                if (cache.hasEvent(id)) {
+                    s.setEvent(cache.getEventDto(id));
+                    cacheHits.add(id);
+                }
+            }
+            s.setEvents(cache.cacheEvents(getEventsForAlarms(eventIds.stream().filter(id -> !cacheHits.contains(id)).collect(Collectors.toList()))));
         }
         return situations.values().stream().collect(Collectors.toSet());
     }
