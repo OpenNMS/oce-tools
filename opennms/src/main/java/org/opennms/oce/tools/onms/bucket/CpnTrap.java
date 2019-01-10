@@ -20,7 +20,7 @@ public class CpnTrap {
 
     public boolean matches(OnmsTrap t) {
         // FIXME from matching code
-        return false;
+        return true;
     }
 
     public boolean matchesAny(List<OnmsTrap> traps) {

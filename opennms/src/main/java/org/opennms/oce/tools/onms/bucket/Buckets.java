@@ -131,6 +131,10 @@ public class Buckets {
         for (Node node : nodes) {
             node.setMatchableSituations(node.getSituations());
             for (Ticket t : node.getTickets()) {
+                // TODO - remove.
+                if (!t.getId().equals("4740178")) {
+                    continue;
+                }
                 LOG.debug("Attempting to match TICKET {}", t.getId());
                 try {
                     t.setTraps(getTicketTraps(t));
@@ -168,7 +172,7 @@ public class Buckets {
         partialMatches.forEach(Buckets::printPartialMatch);
 
         System.out.printf("There were %d tickets that were not matched:\n\n", unmatchedTickets.size());
-        unmatchedTickets.forEach(Buckets::printUnmatchedTicket);
+        // unmatchedTickets.forEach(Buckets::printUnmatchedTicket);
     }
 
     private List<ESEventDTO> getEventsForAlarms(List<Integer> eventIds) {

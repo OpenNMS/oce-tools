@@ -51,10 +51,9 @@ public class Ticket {
 
     public boolean partiallymatches(Situation s) {
         // return ANY syslogs match ANY s.syslogs || ANY traps match ANY s.traps
-        return syslogs.size() == s.getSyslogs().size() &&
-                traps.size() == s.getTraps().size() &&
-                syslogs.stream().anyMatch(syslog -> syslog.matchesAny(s.getSyslogs())) &&
-                traps.stream().anyMatch(trap -> trap.matchesAny(s.getTraps()));
+        boolean aSyslogMatched = syslogs.stream().anyMatch(syslog -> syslog.matchesAny(s.getSyslogs()));
+        boolean aTrapMatched = traps.stream().anyMatch(trap -> trap.matchesAny(s.getTraps()));
+        return aSyslogMatched || aTrapMatched;
     }
 
     public void setSyslogs(List<CpnSyslog> syslogs) {
