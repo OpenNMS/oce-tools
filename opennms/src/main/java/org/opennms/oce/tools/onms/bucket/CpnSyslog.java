@@ -2,8 +2,6 @@ package org.opennms.oce.tools.onms.bucket;
 
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-
 import org.opennms.netmgt.syslogd.SyslogMessage;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.tsaudit.SyslogParser;
@@ -50,5 +48,9 @@ public class CpnSyslog {
     @Override
     public String toString() {
         return "Syslog[" + time + "|" + detailedDescription + "]";
+    }
+
+    public String getMessage() {
+        return message;
     }
 }

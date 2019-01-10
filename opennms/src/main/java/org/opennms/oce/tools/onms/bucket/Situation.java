@@ -20,7 +20,8 @@ public class Situation {
 
     private Integer id;
 
-    private final List<OnmsSyslog> syslogs = new ArrayList<>();
+    // Syslogs stored in map keyed by msg
+    private final Map<String, List<OnmsSyslog>> syslogs = new HashMap<>();
 
     private final List<OnmsTrap> traps = new ArrayList<>();
 
@@ -40,12 +41,16 @@ public class Situation {
         return id;
     }
 
-    public List<OnmsSyslog> getSyslogs() {
-        return syslogs;
+    public boolean hasSyslogMessage(String msg) {
+        return syslogs.containsKey(msg);
     }
 
-    public void setSyslogs(List<OnmsSyslog> onmsSyslogs) {
-        syslogs.addAll(onmsSyslogs);
+    public List<OnmsSyslog> getSyslogs(String msg) {
+        return syslogs.get(msg);
+    }
+
+    public List<OnmsSyslog> getSyslogs() {
+        return syslogs.values().stream().flatMap(List::stream).collect(Collectors.toList());
     }
 
     public List<OnmsTrap> getTraps() {
@@ -64,11 +69,17 @@ public class Situation {
         // FIXME --- convert each event to syslog or trap and add to stack
         if (dto.getSyslogMessage() != null) {
             LOG.debug("Situation [{}] - Event [{}] : THIS IS A SYSLOG: {}", id, dto.getId(), dto.getSyslogMessage());
-            syslogs.add(new OnmsSyslog(dto));
+            addsyslogs(new OnmsSyslog(dto));
         } else {
             LOG.debug("Situation [{}] - Event [{}] : THIS IS A TRAP: {}", id, dto.getId(), dto.getTrapTypeOid());
             traps.add(new OnmsTrap(dto));
         }
+    }
+
+    private void addsyslogs(OnmsSyslog syslog) {
+        syslogs.computeIfAbsent(syslog.getMessage(), k -> new ArrayList<>());
+        List<OnmsSyslog> logs = syslogs.get(syslog.getMessage());
+        logs.add(syslog);
     }
 
     public void addAlarmId(Integer alarmId) {

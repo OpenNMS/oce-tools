@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -25,7 +26,6 @@ import org.opennms.oce.tools.es.ESClient;
 import org.opennms.oce.tools.es.ESClusterConfiguration;
 import org.opennms.oce.tools.es.ESConfigurationDao;
 import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
-import org.opennms.oce.tools.onms.alarmdto.EventDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
 import org.opennms.oce.tools.tsaudit.NodeAndFacts;
@@ -50,6 +50,8 @@ public class Buckets {
     private final ESDataProvider esDataProvider;
 
     private final ObjectCache cache = new ObjectCache();
+
+    private final Date started = new Date();
 
     public Buckets(ESDataProvider esDataProvider) {
         this.esDataProvider = Objects.requireNonNull(esDataProvider);
@@ -166,6 +168,8 @@ public class Buckets {
             }
         }
 
+        Date finish = new Date();
+
         System.out.printf("There were %d matches out of %d tickets:\n\n", matches.size(), nodes.stream().map(Node::getTickets).mapToInt(Set::size).sum());
 
         System.out.printf("There were %d partial matches:\n\n", partialMatches.size());
@@ -173,6 +177,9 @@ public class Buckets {
 
         System.out.printf("There were %d tickets that were not matched:\n\n", unmatchedTickets.size());
         // unmatchedTickets.forEach(Buckets::printUnmatchedTicket);
+
+        LOG.info("TIMER::: started: {} and finished: {}", started, finish);
+
     }
 
     private List<ESEventDTO> getEventsForAlarms(List<Integer> eventIds) {
