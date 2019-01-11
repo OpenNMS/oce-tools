@@ -11,12 +11,9 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -29,7 +26,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.elasticsearch.index.query.QueryBuilder;
@@ -137,13 +133,13 @@ public class Buckets {
             /////////////////////////////////////////////
 
             // Try the matching
-            parseNodesAndEvents(nodeAndEvents, tickets, situations);
+            matcheTicketsAndSituations(nodeAndEvents, tickets, situations);
 
         }
     }
 
     // Attempt to match all of the Tickets on the Node during the time window.
-    private void parseNodesAndEvents(NodeAndEvents nodeAndEvents, List<TicketAndEvents> tickets, List<SituationAndEvents> situations) {
+    public List<List<Match>> matcheTicketsAndSituations(NodeAndEvents nodeAndEvents, List<TicketAndEvents> tickets, List<SituationAndEvents> situations) {
         // a modifiable list - remove situations when matched.
         List<SituationAndEvents> matchableSituations = new ArrayList<>();
         matchableSituations.addAll(situations);
@@ -182,6 +178,8 @@ public class Buckets {
         // unmatchedTickets.forEach(Buckets::printUnmatchedTicket);
 
         LOG.info("TIMER::: started: {} and finished: {}", started, finish);
+
+        return Arrays.asList(matches, partialMatches);
     }
 
     private boolean partiallyMatches(NodeAndEvents nodeAndEvents, TicketAndEvents ticket, SituationAndEvents situation) {
@@ -263,22 +261,12 @@ public class Buckets {
         return allSyslogMatched;
     }
 
-    private List<ESEventDTO> getEventsForAlarms(List<Integer> eventIds) {
-        try {
-            return eventClient.getEventsByIds(eventIds);
-        } catch (IOException e) {
-            LOG.warn("Failed to retrieve events for Event IDs {} : {}", eventIds, e.getMessage());
-        }
-        return Collections.emptyList();
-    }
-
     private static void printPartialMatch(Match m) {
         System.out.println("Partial Match:");
         System.out.println("TICKET[" + m.ticket.getTicket().getTicketId() + "]");
         System.out.println("SITUATION" + m.situation.getSituationDtos().stream().map(AlarmDocumentDTO::getId).distinct().collect(Collectors.toList()));
         System.out.println("-----");
     }
-
 
     ////////// REMOVE all of these copies of LCOAL METHODS>...
     private static final List<QueryBuilder> cpnEventExcludes = Arrays.asList(termQuery("description.keyword", "SNMP authentication failure"));
