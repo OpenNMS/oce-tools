@@ -137,10 +137,9 @@ public class EventMatcher {
             List<ESEventDTO> potentialMatches = onmsTrapsByType.get(type);
 
             if (potentialMatches != null) {
-                // Remove any Onms events that have already been paired so we don't pair them twice
-                potentialMatches.removeIf(potential -> alreadyMatchedOnmsEvents.contains(potential.getId()));
-
                 for (MatchingTrapEventRecord cpnTrap : cpnTrapsForOid) {
+                    // Remove any Onms events that have already been paired so we don't pair them twice
+                    potentialMatches.removeIf(potential -> alreadyMatchedOnmsEvents.contains(potential.getId()));
                     // Refine the potential matches for this specific instance of the trap
                     List<ESEventDTO> refinedPotentialMatches = filterMatchesForTrap(cpnTrap, potentialMatches);
 

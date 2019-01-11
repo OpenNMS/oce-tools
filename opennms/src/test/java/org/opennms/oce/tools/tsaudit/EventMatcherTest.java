@@ -117,7 +117,7 @@ public class EventMatcherTest {
     }
 
     @Test
-    public void canNotMatchEventTwice() throws ExecutionException, InterruptedException {
+    public void canNotMatchSyslogEventTwice() throws ExecutionException, InterruptedException {
         List<MatchingSyslogEventRecord> cpnSyslogs = new ArrayList<>();
         List<ESEventDTO> onmsSyslogs = new ArrayList<>();
 
@@ -149,6 +149,41 @@ public class EventMatcherTest {
         Map<String, Integer> results = EventMatcher.matchSyslogEventsScopedByTimeAndHost(cpnSyslogs, onmsSyslogs);
         // only one should have matched since we don't allow matching the same Onms event to multiple cpn events
         assertThat(results.values(), hasSize(1));
+    }
+    
+    @Test
+    public void canNotMatchTrapEventTwice() {
+        List<MatchingTrapEventRecord> cpnTraps = new ArrayList<>();
+        List<ESEventDTO> onmsTraps = new ArrayList<>();
+
+        Date ts = new Date();
+
+        String cpnId = "101";
+        String host = "testhost";
+        int ifIndex = 436305920;
+        String ifDescr = "Ethernet1/32";
+        String location = String.format("%s: %s", host, ifDescr);
+
+        String trapType = ".1.3.6.1.6.3.1.1.5.3";
+        MatchingTrapEventRecord t1 = new ImplMatchingTrapEventRecord(cpnId, location, ts, trapType);
+        // Dupe the Cpn event with a different Id
+        MatchingTrapEventRecord t2 = new ImplMatchingTrapEventRecord(cpnId + "_dupe", location, ts, trapType);
+
+        cpnTraps.add(t1);
+        cpnTraps.add(t2);
+
+        ESEventDTO e1 = new ESEventDTO();
+        Integer onmsId = 1;
+        e1.setId(onmsId);
+        e1.setNodeLabel(host);
+        e1.setTimestamp(new Date(ts.getTime() - 20000));
+        setTrapTypeOid(e1, trapType);
+        setIfDescrOid(e1, ifIndex, ifDescr);
+
+        onmsTraps.add(e1);
+
+        Map<String, Integer> matchedTraps = EventMatcher.matchTrapEventsScopedByTimeAndHost(cpnTraps, onmsTraps);
+        assertThat(matchedTraps.values(), hasSize(1));
     }
 
     @Test
