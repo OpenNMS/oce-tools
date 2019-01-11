@@ -1,4 +1,4 @@
-package org.opennms.oce.tools.onms.bucket;
+package org.opennms.oce.tools.tsaudit;
 
 import static java.util.stream.Collectors.groupingBy;
 import static org.elasticsearch.index.query.QueryBuilders.matchPhraseQuery;
@@ -40,16 +40,6 @@ import org.opennms.oce.tools.es.ESConfigurationDao;
 import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
-import org.opennms.oce.tools.tsaudit.EventMatcher;
-import org.opennms.oce.tools.tsaudit.GenericSyslogMessage;
-import org.opennms.oce.tools.tsaudit.Lifespan;
-import org.opennms.oce.tools.tsaudit.Match;
-import org.opennms.oce.tools.tsaudit.NodeAndEvents;
-import org.opennms.oce.tools.tsaudit.NodeAndFacts;
-import org.opennms.oce.tools.tsaudit.OnmsAlarmSummary;
-import org.opennms.oce.tools.tsaudit.SituationAndEvents;
-import org.opennms.oce.tools.tsaudit.StateCache;
-import org.opennms.oce.tools.tsaudit.TicketAndEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,9 +49,9 @@ import org.slf4j.LoggerFactory;
 // List of tickets (attached to Nodes)
 // List of situations (attached to Nodes)
 // Output: buckets with meta-data
-public class Buckets {
+public class TicketMatcher {
 
-    private static final Logger LOG = LoggerFactory.getLogger(Buckets.class);
+    private static final Logger LOG = LoggerFactory.getLogger(TicketMatcher.class);
 
     private List<Match> matches = new ArrayList<>();
     private List<Match> partialMatches = new ArrayList<>();
@@ -71,7 +61,7 @@ public class Buckets {
 
     private final Date started = new Date();
 
-    public Buckets(ESDataProvider esDataProvider) {
+    public TicketMatcher(ESDataProvider esDataProvider) {
         this.esDataProvider = Objects.requireNonNull(esDataProvider);
     }
 
@@ -85,7 +75,7 @@ public class Buckets {
 
         ESClient esClient = new ESClient(clusterConfiguration);
         ESDataProvider esDataProvider = new ESDataProvider(esClient);
-        Buckets b = new Buckets(esDataProvider);
+        TicketMatcher b = new TicketMatcher(esDataProvider);
         NodeAndFacts node = new NodeAndFacts(System.getProperty("hostname"));
         node.setOpennmsNodeLabel(System.getProperty("host.fqdn"));
         node.setOpennmsNodeId(859);
@@ -134,13 +124,13 @@ public class Buckets {
             /////////////////////////////////////////////
 
             // Try the matching
-            matcheTicketsAndSituations(nodeAndEvents, tickets, situations);
+            matchTicketsAndSituations(nodeAndEvents, tickets, situations);
 
         }
     }
 
     // Attempt to match all of the Tickets on the Node during the time window.
-    public List<List<Match>> matcheTicketsAndSituations(NodeAndEvents nodeAndEvents, List<TicketAndEvents> tickets, List<SituationAndEvents> situations) {
+    public List<List<Match>> matchTicketsAndSituations(NodeAndEvents nodeAndEvents, List<TicketAndEvents> tickets, List<SituationAndEvents> situations) {
         // a modifiable list - remove situations when matched.
         List<SituationAndEvents> matchableSituations = new ArrayList<>();
         matchableSituations.addAll(situations);
@@ -173,7 +163,7 @@ public class Buckets {
         System.out.printf("There were %d matches out of %d tickets:\n\n", matches.size(), tickets.size());
 
         System.out.printf("There were %d partial matches:\n\n", partialMatches.size());
-        partialMatches.forEach(Buckets::printPartialMatch);
+        partialMatches.forEach(TicketMatcher::printPartialMatch);
 
         System.out.printf("There were %d tickets that were not matched:\n\n", unmatchedTickets.size());
         // unmatchedTickets.forEach(Buckets::printUnmatchedTicket);
