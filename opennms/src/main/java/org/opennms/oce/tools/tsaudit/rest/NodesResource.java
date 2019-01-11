@@ -192,7 +192,7 @@ public class NodesResource {
         for (TicketAndEvents ticketAndEvents : allTicketsAndEvents) {
             final TicketRecord ticket = ticketAndEvents.getTicket();
             final VizSituationDTO vizSituationDTO = new VizSituationDTO(ticket.getTicketId(), CPN_SOURCE,
-                    ticket.getRootEventTime().getTime(), ticket.getLastModificationTime().getTime(),
+                    ticket.getCreationTime().getTime(), ticket.getLastModificationTime().getTime(),
                     ticket.getDescription(), ticketIdToAlarmIds.getOrDefault(ticket.getTicketId(), Collections.emptySet()));
             situations.add(vizSituationDTO);
         }
