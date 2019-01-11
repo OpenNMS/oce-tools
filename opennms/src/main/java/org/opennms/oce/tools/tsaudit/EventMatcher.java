@@ -48,11 +48,14 @@ import org.opennms.oce.tools.cpn2oce.EventMapper;
 import org.opennms.oce.tools.cpn2oce.model.ModelObject;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.model.v1.OnmsSnmpConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.snmp4j.smi.OID;
 
 import com.google.common.annotations.VisibleForTesting;
 
 public class EventMatcher {
+    private static final Logger LOG = LoggerFactory.getLogger(EventMatcher.class);
     private static final long timeDeltaAllowedMs = TimeUnit.MILLISECONDS.convert(120, TimeUnit.SECONDS);
     @VisibleForTesting
     static final long syslogDateFuzzMs = TimeUnit.MILLISECONDS.convert(1, TimeUnit.SECONDS);
@@ -96,6 +99,7 @@ public class EventMatcher {
                         .ifPresent(onmsSyslog -> {
                             Integer onmsId = Integer.parseInt(onmsSyslog.getId());
                             cpnEventIdToOnmsEventId.put(cpnSyslog.getId(), onmsId);
+                            LOG.debug("Matched syslog events that were time-skewed: {}->{}",cpnSyslog.getId(), onmsId);
                             alreadyMatchedOnmsEvents.add(onmsId);
                         });
             }
