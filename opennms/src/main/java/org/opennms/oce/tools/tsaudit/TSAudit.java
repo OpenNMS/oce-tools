@@ -65,6 +65,7 @@ import org.opennms.oce.tools.cpn.model.TrapRecord;
 import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
+import org.opennms.oce.tools.tsaudit.rest.RestServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,11 +86,13 @@ public class TSAudit {
     private final List<String> hostnameSubstringsToFilter;
     private final StateCache stateCache;
     private final boolean csvOutput;
+    private final boolean restServerEnabled;
 
     // Don't consider authentication failure traps
     private static final List<QueryBuilder> cpnEventExcludes = Arrays.asList(termQuery("description.keyword", "SNMP authentication failure"));
 
-    public TSAudit(ESDataProvider esDataProvider, EventClient eventClient, ZonedDateTime start, ZonedDateTime end, List<String> hostnames, boolean csvOutput) {
+    public TSAudit(ESDataProvider esDataProvider, EventClient eventClient, ZonedDateTime start, ZonedDateTime end, List<String> hostnames,
+                   boolean csvOutput, boolean restServerEnabled) {
         this.esDataProvider = Objects.requireNonNull(esDataProvider);
         this.eventClient = Objects.requireNonNull(eventClient);
 
@@ -100,6 +103,7 @@ public class TSAudit {
 
         this.hostnameSubstringsToFilter = Objects.requireNonNull(hostnames);
         this.csvOutput = csvOutput;
+        this.restServerEnabled = restServerEnabled;
 
         this.stateCache = new StateCache(startMs, endMs);
     }
@@ -125,9 +129,15 @@ public class TSAudit {
                 .filter(NodeAndFacts::shouldProcess)
                 .collect(Collectors.toList());
 
+        final List<NodeAndEvents> allNodesAndEvents = new LinkedList<>();
         for (NodeAndFacts nodeAndFacts : nodesToProcess) {
             // Gather all the events of interest for the node we want to process
             final NodeAndEvents nodeAndEvents = retrieveAndPairEvents(nodeAndFacts);
+
+            if (restServerEnabled) {
+                // Only keep these around if we need to
+                allNodesAndEvents.add(nodeAndEvents);
+            }
 
             // Print the matches
             printEventMatches(nodeAndEvents.getMatchedTraps(), nodeAndEvents.getCpnTrapEvents(), nodeAndEvents.getOnmsTrapEvents());
@@ -142,6 +152,11 @@ public class TSAudit {
             // Match
             final List<SituationMatchResult> matchResults = match(nodeAndEvents, ticketsAndEvents, situationsAndEvents);
             printSituationMatches(matchResults);
+        }
+
+        if (restServerEnabled) {
+            final RestServer restServer = new RestServer(nodesAndFacts, allNodesAndEvents);
+            restServer.startAndBlock();
         }
     }
 

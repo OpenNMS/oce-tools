@@ -53,6 +53,9 @@ public class TSAuditCommand extends AbstractCommand {
     @Option(name = "--csv", usage = "Output the tables in CSV format instead of pretty printing")
     private boolean csvOutput = false;
 
+    @Option(name = "--rest", usage = "Spawn a REST server and serve the results after processing")
+    private boolean restServerEnabled = false;
+
     public TSAuditCommand() {
         super(NAME);
     }
@@ -65,7 +68,8 @@ public class TSAuditCommand extends AbstractCommand {
         EventClient eventClient = new EventClient(esClient);
 
         CommandUtils.DateRange range = CommandUtils.parseDateRange(from, to);
-        final TSAudit tsAudit = new TSAudit(esDataProvider, eventClient, range.getStart(), range.getEnd(), hostnames, csvOutput);
+        final TSAudit tsAudit = new TSAudit(esDataProvider, eventClient, range.getStart(), range.getEnd(), hostnames,
+                csvOutput, restServerEnabled);
         tsAudit.run();
     }
 }
