@@ -39,8 +39,11 @@ import org.opennms.core.time.ZonedDateTimeBuilder;
 import org.opennms.netmgt.syslogd.ByteBufferParser;
 import org.opennms.netmgt.syslogd.RadixTreeSyslogParser;
 import org.opennms.netmgt.syslogd.SyslogMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SyslogParser {
+    private static final Logger LOG = LoggerFactory.getLogger(SyslogParser.class);
     private static final ByteBufferParser<SyslogMessage> parser = RadixTreeSyslogParser.getRadixParser();
 
     public static SyslogMessage parse(String syslogMessageString) throws InterruptedException, ExecutionException {
@@ -80,7 +83,7 @@ public class SyslogParser {
                 ZonedDateTime time = zonedDateTimeBuilder.build();
                 syslogMessage.setDate(Date.from(time.toInstant()));
             } catch (DateTimeException e) {
-                e.printStackTrace();
+                LOG.error("Failed to parse date for [{}] : {}", syslogMessageString, e.getMessage());
             }
         }
 
