@@ -1,7 +1,4 @@
-package org.opennms.oce.tools.onms.bucket;
-
-import org.opennms.oce.tools.tsaudit.SituationAndEvents;
-import org.opennms.oce.tools.tsaudit.TicketAndEvents;
+package org.opennms.oce.tools.tsaudit;
 
 public class Match {
 

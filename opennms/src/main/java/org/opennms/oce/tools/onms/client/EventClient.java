@@ -31,7 +31,6 @@ package org.opennms.oce.tools.onms.client;
 import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
 import static org.elasticsearch.index.query.QueryBuilders.existsQuery;
 import static org.elasticsearch.index.query.QueryBuilders.matchQuery;
-import static org.elasticsearch.index.query.QueryBuilders.matchPhraseQuery;
 import static org.elasticsearch.index.query.QueryBuilders.nestedQuery;
 import static org.elasticsearch.index.query.QueryBuilders.prefixQuery;
 import static org.elasticsearch.index.query.QueryBuilders.rangeQuery;
@@ -53,8 +52,6 @@ import org.apache.lucene.search.join.ScoreMode;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
-import org.elasticsearch.index.query.RangeQueryBuilder;
-import org.elasticsearch.index.query.TermsQueryBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.sort.SortOrder;
 import org.opennms.oce.tools.es.ESClient;
@@ -232,21 +229,6 @@ public class EventClient {
         return matchedEvents.stream().findFirst();
     }
 
-    public List<AlarmDocumentDTO> getSituationsForHostname(long startMs, long endMs, String hostname) throws IOException {
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(QueryBuilders.boolQuery()
-                .must(matchPhraseQuery("node.label", hostname))
-                .must(termQuery("situation", "true"))
-                .must(rangeQuery("@update_time").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
-        final Search search = new Search.Builder(searchSourceBuilder.toString())
-                .setParameter(Parameters.SCROLL, "5m")
-                .build();
-
-        final List<AlarmDocumentDTO> situations = new ArrayList<>();
-        scroll(search, AlarmDocumentDTO.class, situations::addAll);
-        return situations;
-    }
-
     public List<AlarmDocumentDTO> getSituationsOnNodeId(long startMs, long endMs, int nodeId) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.boolQuery()
@@ -263,25 +245,6 @@ public class EventClient {
         return situations;
     }
 
-    public List<AlarmDocumentDTO> getAlarmsByIds(List<Integer> alarmIds, long startMs, long endMs) throws IOException {
-        if (alarmIds == null || alarmIds.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        final TermsQueryBuilder termQuery = new TermsQueryBuilder("id", alarmIds.stream().mapToInt(i -> i).toArray());
-        searchSourceBuilder.query(QueryBuilders.boolQuery()
-            .must(termQuery)
-            .must(rangeQuery("@update_time").gte(startMs).lte(endMs).includeLower(true).includeUpper(true).format("epoch_millis")));
-        final Search search = new Search.Builder(searchSourceBuilder.toString())
-                .setParameter(Parameters.SCROLL, "5m")
-                .build();
-
-        final List<AlarmDocumentDTO> alarms = new ArrayList<>();
-        scroll(search, AlarmDocumentDTO.class, alarms::addAll);
-        return alarms;
-    }
-
     public List<AlarmDocumentDTO> getAlarmsOnNodeId(long startMs, long endMs, int nodeId) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.boolQuery()
@@ -296,25 +259,6 @@ public class EventClient {
         final List<AlarmDocumentDTO> situations = new ArrayList<>();
         scroll(search, AlarmDocumentDTO.class, situations::addAll);
         return situations;
-    }
-
-    public List<ESEventDTO> getEventsByIds(List<Integer> eventIds) throws IOException {
-        if (eventIds == null || eventIds.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        final TermsQueryBuilder termQuery = new TermsQueryBuilder("id", eventIds.stream().mapToInt(i -> i).toArray());
-        searchSourceBuilder.query(termQuery);
-        final Search search = new Search.Builder(searchSourceBuilder.toString())
-                .addIndex(esClusterConfiguration.getOpennmsEventIndex())
-                .addSort(new Sort("@timestamp"))
-                .setParameter(Parameters.SCROLL, "5m")
-                .build();
-
-        final List<ESEventDTO> matchedEvents = new ArrayList<>();
-        scroll(search, ESEventDTO.class, matchedEvents::addAll);
-        return matchedEvents;
     }
 
     public long getNumSyslogEvents(long startMs, long endMs, int nodeId) throws IOException {

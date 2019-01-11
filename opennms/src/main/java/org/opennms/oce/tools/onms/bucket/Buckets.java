@@ -43,6 +43,7 @@ import org.opennms.oce.tools.onms.client.EventClient;
 import org.opennms.oce.tools.tsaudit.EventMatcher;
 import org.opennms.oce.tools.tsaudit.GenericSyslogMessage;
 import org.opennms.oce.tools.tsaudit.Lifespan;
+import org.opennms.oce.tools.tsaudit.Match;
 import org.opennms.oce.tools.tsaudit.NodeAndEvents;
 import org.opennms.oce.tools.tsaudit.NodeAndFacts;
 import org.opennms.oce.tools.tsaudit.OnmsAlarmSummary;
