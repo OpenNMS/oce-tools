@@ -70,10 +70,7 @@ public class Buckets {
     private List<Match> partialMatches = new ArrayList<>();
     private List<TicketAndEvents> unmatchedTickets = new ArrayList<>();
 
-    private Map<String, Node> nodesByName;
     private final ESDataProvider esDataProvider;
-
-    private final ObjectCache cache = new ObjectCache();
 
     private final Date started = new Date();
 
@@ -110,26 +107,6 @@ public class Buckets {
     }
 
     public void run(List<NodeAndFacts> nodes, ZonedDateTime start, ZonedDateTime end) throws IOException, ExecutionException, InterruptedException {
-        // Map NodeAndFacts to bucket nodes DTO
-        // Retrieve Tickets and the rest of the CPN data
-        nodesByName = nodes.stream().map(n -> new Node(n.getOpennmsNodeId(), n.getOpennmsNodeLabel(), n.getCpnHostname()))
-                                         .collect(Collectors.toMap(Node::getCpnHostname, Function.identity()));
-
-        // Retrieve Tickets
-        esDataProvider.getTicketRecordsInRange(start, end, tickets -> {
-            for (TicketRecord ticket : tickets) {
-                addTicketToNode(ticket);
-            }
-        });
-
-        // Filter CPN data as required and retrieve corresponding ONMS data.
-        Collection<Node> filteredNodes = filter(nodesByName.values());
-        for (Node n : filteredNodes) {
-            getOnmsData(n, start, end);
-        }
-
-
-
         /////////////////////////////////////////////
         ///// SETUP START - FOR TESTING ONLY
         /////////////////////////////////////////////
@@ -163,25 +140,6 @@ public class Buckets {
             parseNodesAndEvents(nodeAndEvents, tickets, situations);
 
         }
-    }
-
-    private void addTicketToNode(TicketRecord record) {
-        Node node = nodesByName.get(getSanitizedLocation(record.getLocation()));
-        if (node != null) {
-            node.addTicket(new Ticket(record));
-        } else {
-            node = new Node(0, "", getSanitizedLocation(record.getLocation()));
-            node.addTicket(new Ticket(record));
-            nodesByName.put(getSanitizedLocation(record.getLocation()), node);
-            LOG.info("Failed to find node {} for ticket: {}", getSanitizedLocation(record.getLocation()), record);
-        }
-    }
-
-    private static String getSanitizedLocation(String location) {
-        if (location.contains(":")) {
-            return location.substring(0, location.indexOf(":"));
-        }
-        return location;
     }
 
     // Attempt to match all of the Tickets on the Node during the time window.
@@ -321,83 +279,6 @@ public class Buckets {
         System.out.println("-----");
     }
 
-    private void getOnmsData(Node node, ZonedDateTime start, ZonedDateTime end) {
-        // Query ES and collect the appropriate data
-        // Situations and Syslogs and Traps for the node (and Date Range)
-        node.addAllSituations(getSituations(node, start, end));
-    }
-
-    // Get reduced Situation, Alarm and Event data for the node over the given time range.
-    private Set<Situation> getSituations(Node node, ZonedDateTime start, ZonedDateTime end) {
-        // Keyed on Situation/Alarm ID to reduce multiple Alarm Documents to a Single Situation.
-        Map<Integer, Situation> situations = new HashMap<>();
-
-        List<AlarmDocumentDTO> situationDtos;
-        try {
-            situationDtos = eventClient.getSituationsForHostname(start.toInstant().toEpochMilli(), end.toInstant().toEpochMilli(), node.getOnmsNodeLabel());
-        } catch (IOException e) {
-            LOG.warn("Error retrieving situations for Node {} on range {} to {} : {}", node.getOnmsNodeLabel(), start, end, e.getMessage());
-            return Collections.emptySet();
-        }
-
-        // Reduce multiple documents to single Situations collecting all relatedReduction Keys and relatedAlarm Ids
-        for (AlarmDocumentDTO dto : situationDtos) {
-            situations.computeIfAbsent(dto.getId(), k -> new Situation(dto));
-            Situation s = situations.get(dto.getId());
-            s.addRelatedAlarmIds(dto.getRelatedAlarmIds());
-            s.addReductionKeys(dto.getRelatedAlarmReductionKeys());
-        }
-        LOG.debug("{} Situations DTOs reduced to {} Situations.", situationDtos.size(), situations.size());
-        // Retrieve Alarms for each situation, reducing Alarm Documents as above.
-        for (Situation s : situations.values()) {
-            LOG.debug("Populating Situation {} ", s.getId());
-            // Try the cache and retrieve relatedAlarmIds that are cache misses.
-            Set<Integer> cacheHits = new HashSet<>();
-            for (Integer id : s.getRelatedAlarmIds()) {
-                if (cache.hasAlarm(id)) {
-                    s.addRelatedAlarm(cache.getAlarm(id));
-                    cacheHits.add(id);
-                }
-            }
-            try {
-                // retrieve cache misses from ES.
-                s.addRelatedAlarmDtos(eventClient.getAlarmsByIds(s.getRelatedAlarmIds().stream().filter(id -> !cacheHits.contains(id)).collect(Collectors.toList()),
-                                                                 start.toInstant().toEpochMilli(), 
-                                                                 end.toInstant().toEpochMilli()));
-            } catch (IOException e) {
-                LOG.warn("Error retrieving ALARMS for Situation {} : {} ", s, e.getMessage());
-            }
-            cache.cacheAlarms(s.getRelatedAlarms());
-        }
-        // retrieve the related events and add them to the situations
-        for (Situation s : situations.values()) {
-            List<Integer> eventIds = s.getRelatedAlarms().stream().flatMap(a -> a.getEventIds().stream()).filter(Objects::nonNull).collect(Collectors.toList());
-            Set<Integer> cacheHits = new HashSet<>();
-            for (Integer id : eventIds) {
-                if (cache.hasEvent(id)) {
-                    s.setEvent(cache.getEventDto(id));
-                    cacheHits.add(id);
-                }
-            }
-            s.setEvents(cache.cacheEvents(getEventsForAlarms(eventIds.stream().filter(id -> !cacheHits.contains(id)).collect(Collectors.toList()))));
-        }
-        return situations.values().stream().collect(Collectors.toSet());
-    }
-
-    private Collection<Node> filter(Collection<Node> nodes) {
-        
-        // for now just use node named in System.getProperties()
-        return nodes.stream().filter(n -> n.getOnmsNodeId() == 859).collect(Collectors.toSet());
-            
-        // TODO - Do filtering
-        // TODO - report out data that is filtered.
-        /*
-         * Filtering: Filter services from tickets, 
-         * filter tickets that only contain service events 
-         * Filter tickets that contain a “bad” node Filter tickets with a single “alarm”
-         * Filter tickets that affect many nodes (to be revisited) TODO: FIXME: smith
-         */
-    }
 
     ////////// REMOVE all of these copies of LCOAL METHODS>...
     private static final List<QueryBuilder> cpnEventExcludes = Arrays.asList(termQuery("description.keyword", "SNMP authentication failure"));
