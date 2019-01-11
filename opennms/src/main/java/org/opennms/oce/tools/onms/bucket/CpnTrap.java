@@ -3,8 +3,12 @@ package org.opennms.oce.tools.onms.bucket;
 import java.util.List;
 
 import org.opennms.oce.tools.cpn.model.TrapRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CpnTrap {
+
+    private static final Logger LOG = LoggerFactory.getLogger(CpnTrap.class);
 
     private String trapTypeOid;
 
@@ -19,6 +23,9 @@ public class CpnTrap {
     }
 
     public boolean matches(OnmsTrap t) {
+        if (trapTypeOid.equals(t.getTrapType())) {
+            LOG.debug("Trap Type Match: {} - {}", trapTypeOid, t.getTrapType());
+        }
         // FIXME from matching code
         return true;
     }

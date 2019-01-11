@@ -29,6 +29,8 @@ import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
 import org.opennms.oce.tools.tsaudit.NodeAndFacts;
+import org.opennms.oce.tools.tsaudit.SituationAndEvents;
+import org.opennms.oce.tools.tsaudit.TicketAndEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +46,7 @@ public class Buckets {
 
     private List<Match> matches = new ArrayList<>();
     private List<Match> partialMatches = new ArrayList<>();
-    private List<Ticket> unmatchedTickets = new ArrayList<>();
+    private List<TicketAndEvents> unmatchedTickets = new ArrayList<>();
 
     private Map<String, Node> nodesByName;
     private final ESDataProvider esDataProvider;
@@ -128,49 +130,34 @@ public class Buckets {
     }
 
     // Attempt to match all of the Tickets on the Node during the time window.
-    private void parseNodes(Collection<Node> nodes, ZonedDateTime start, ZonedDateTime end) {
-        // TODO - sort chrono Tickets and Situations
-        for (Node node : nodes) {
-            node.setMatchableSituations(node.getSituations());
-            for (Ticket t : node.getTickets()) {
-                // TODO - remove.
-                if (!t.getId().equals("4740178")) {
-                    continue;
+    private void parseNodesAndEvents(List<TicketAndEvents> tickets, List<SituationAndEvents> situations) {
+        List<AlarmDocumentDTO> matchableSituations = situations.stream().map(SituationAndEvents::getSituationDtos).flatMap(List::stream).collect(Collectors.toList());
+        for (TicketAndEvents t : tickets) {
+            boolean ticketIsUnmatched = true;
+            //
+            for (Iterator<AlarmDocumentDTO> iterator = matchableSituations.iterator(); iterator.hasNext();) {
+                AlarmDocumentDTO situation = iterator.next();
+                if (matches(t, situation)) {
+                    matches.add(new Match(t, situation));
+                    ticketIsUnmatched = false;
+                    matchableSituations.remove(situation);
+                    break;
                 }
-                LOG.debug("Attempting to match TICKET {}", t.getId());
-                try {
-                    t.setTraps(getTicketTraps(t));
-                    t.setSyslogs(getTicketSyslogs(t));
-                } catch (IOException e) {
-                    LOG.warn("Failed to retrieve event for TICKET {} : {}", t.getId(), e.getMessage());
-                    continue;
+                if (partiallyMatches(t, situation)) {
+                    partialMatches.add(new Match(t, situation));
+                    ticketIsUnmatched = false;
+                    matchableSituations.remove(situation);
+                    break;
                 }
-                boolean ticketIsUnmatched = true;
-                //
-                for (Iterator<Situation> iterator = node.getMatchableSituations().iterator(); iterator.hasNext();) {
-                    Situation s = iterator.next();
-                    if (t.matches(s)) {
-                        matches.add(new Match(t, s));
-                        ticketIsUnmatched = false;
-                        node.removeMatchableSituation(s);
-                        break;
-                    }
-                    if (t.partiallyMatches(s)) {
-                        partialMatches.add(new Match(t, s));
-                        ticketIsUnmatched = false;
-                        node.removeMatchableSituation(s);
-                        break;
-                    }
-                }
-                if (ticketIsUnmatched) {
-                    unmatchedTickets.add(t);
-                }
+            }
+            if (ticketIsUnmatched) {
+                unmatchedTickets.add(t);
             }
         }
 
         Date finish = new Date();
 
-        System.out.printf("There were %d matches out of %d tickets:\n\n", matches.size(), nodes.stream().map(Node::getTickets).mapToInt(Set::size).sum());
+        System.out.printf("There were %d matches out of %d tickets:\n\n", matches.size(), tickets.size());
 
         System.out.printf("There were %d partial matches:\n\n", partialMatches.size());
         partialMatches.forEach(Buckets::printPartialMatch);
@@ -180,6 +167,16 @@ public class Buckets {
 
         LOG.info("TIMER::: started: {} and finished: {}", started, finish);
 
+    }
+
+    private boolean partiallyMatches(TicketAndEvents t, AlarmDocumentDTO situation) {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    private boolean matches(TicketAndEvents t, AlarmDocumentDTO situation) {
+        // TODO Auto-generated method stub
+        return false;
     }
 
     private List<ESEventDTO> getEventsForAlarms(List<Integer> eventIds) {
@@ -202,12 +199,12 @@ public class Buckets {
     private static void printPartialMatch(Match m) {
         System.out.println("Partial Match:");
 
-        System.out.println(m.t);
-        m.t.getSyslogs().stream().forEach(s -> LOG.info("   " + s.toString()));
-        m.t.getTraps().stream().forEach(t -> LOG.info("   " + t.toString()));
-        System.out.println(m.s);
-        m.s.getSyslogs().stream().sorted((s1, s2) -> s1.getDate().compareTo(s2.getDate())).forEach(s -> LOG.info("   " + s.toString()));
-        m.s.getTraps().stream().sorted((s1, s2) -> s1.getDate().compareTo(s2.getDate())).forEach(t -> LOG.info("   " + t.toString()));
+        System.out.println(m.ticket);
+        m.ticket.getSyslogs().stream().forEach(s -> LOG.info("   " + situation.toString()));
+        m.ticket.getTraps().stream().forEach(t -> LOG.info("   " + ticket.toString()));
+        System.out.println(m.situation);
+        m.situation.getSyslogs().stream().sorted((s1, s2) -> s1.getDate().compareTo(s2.getDate())).forEach(s -> LOG.info("   " + situation.toString()));
+        m.situation.getTraps().stream().sorted((s1, s2) -> s1.getDate().compareTo(s2.getDate())).forEach(t -> LOG.info("   " + ticket.toString()));
 
         System.out.println("-----");
     }

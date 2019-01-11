@@ -61,7 +61,7 @@ public class TestDataUtils {
     private static <T> List<T> json2list(URL url, Class<T> clazz) {
         try {
             final String json = Resources.toString(url, StandardCharsets.UTF_8);
-            return Arrays.asList(new Gson().fromJson(json, getArrayClass(clazz)));
+            return (List<T>) Arrays.asList(new Gson().fromJson(json, getArrayClass(clazz)));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

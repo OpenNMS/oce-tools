@@ -51,6 +51,7 @@ public class Ticket {
 
     // TRUE if ANY syslogs match ANY s.syslogs || ANY traps match ANY s.traps
     public boolean partiallyMatches(Situation s) {
+        boolean x = true;
         boolean aSyslogMatched = syslogs.stream().anyMatch(syslog -> s.hasSyslogMessage(syslog.getMessage()) && syslog.matchesAny(s.getSyslogs(syslog.getMessage())));
         boolean aTrapMatched = traps.stream().anyMatch(trap -> trap.matchesAny(s.getTraps()));
         return aSyslogMatched || aTrapMatched;
@@ -66,7 +67,7 @@ public class Ticket {
 
     @Override
     public String toString() {
-        return "Ticket[" + id + "]";
+        return String.format("Ticket[%s| syslogs: %d traps %d ]", id, syslogs.size(), traps.size());
     }
 
 }

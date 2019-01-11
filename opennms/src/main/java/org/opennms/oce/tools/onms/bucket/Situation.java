@@ -57,16 +57,11 @@ public class Situation {
         return traps;
     }
 
-    public void setTraps(List<OnmsTrap> onmsTtraps) {
-        traps.addAll(onmsTtraps);
-    }
-
     public void setEvents(Collection<ESEventDTO> events) {
         events.forEach(e -> setEvent(e));
     }
 
     public void setEvent(ESEventDTO dto) {
-        // FIXME --- convert each event to syslog or trap and add to stack
         if (dto.getSyslogMessage() != null) {
             LOG.debug("Situation [{}] - Event [{}] : THIS IS A SYSLOG: {}", id, dto.getId(), dto.getSyslogMessage());
             addsyslogs(new OnmsSyslog(dto));
@@ -100,7 +95,7 @@ public class Situation {
 
     @Override
     public String toString() {
-        return "Situation[" + id + "|\n" + alarms.values().stream().map(Alarm::toString).collect(Collectors.joining("\n")) + "]";
+        return String.format("Situation[%s| syslogs: %d traps: %d alarms: %d ]", id, syslogs.size(), traps.size(), alarms.size());
     }
 
     public void addRelatedAlarmIds(Set<Integer> relatedAlarmIds) {

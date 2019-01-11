@@ -31,10 +31,13 @@ public class CpnSyslog {
     }
 
     public boolean matches(OnmsSyslog s) {
-        LOG.debug("CPN : {} | {}.", date, message);
-        LOG.debug("ONMS: {} | {}.", s.getDate(), s.getMessage());
+        LOG.trace("CPN : {} | {}.", date, message);
+        LOG.trace("ONMS: {} | {}.", s.getDate(), s.getMessage());
         boolean msgMatched = message != null && message.equals(s.getMessage());
         boolean dateMatched = date != null && date.equals(s.getDate());
+        if (msgMatched && dateMatched) {
+            LOG.info("Matched: \n CPN: {}\n ONMS: {}", detailedDescription, s);
+        }
         return msgMatched && dateMatched;
     }
 
