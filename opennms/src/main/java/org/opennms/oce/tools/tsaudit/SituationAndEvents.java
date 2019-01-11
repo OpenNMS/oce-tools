@@ -28,6 +28,7 @@
 
 package org.opennms.oce.tools.tsaudit;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -36,22 +37,46 @@ import org.opennms.oce.tools.onms.client.ESEventDTO;
 
 public class SituationAndEvents {
     private final List<AlarmDocumentDTO> situationDtos;
+    private final Lifespan lifespan;
     private final List<ESEventDTO> eventsInSituation;
+    private final List<OnmsAlarmSummary> alarmSummaries;
+    private final AlarmDocumentDTO firstSituationDto;
 
-    public SituationAndEvents(List<AlarmDocumentDTO> situationDtos, List<ESEventDTO> eventsInSituation) {
+    public SituationAndEvents(List<AlarmDocumentDTO> situationDtos, Lifespan lifespan, List<ESEventDTO> eventsInSituation, List<OnmsAlarmSummary> alarmSummaries) {
         this.situationDtos = Objects.requireNonNull(situationDtos);
+        this.lifespan = Objects.requireNonNull(lifespan);
         this.eventsInSituation = Objects.requireNonNull(eventsInSituation);
+        this.alarmSummaries = Objects.requireNonNull(alarmSummaries);
+
+        this.firstSituationDto = situationDtos.stream().min(Comparator.comparing(AlarmDocumentDTO::getUpdateTime))
+                .orElseThrow(() -> new RuntimeException("Need at least one Situation DTO"));
     }
 
     public List<AlarmDocumentDTO> getSituationDtos() {
         return situationDtos;
     }
 
+    public Lifespan getLifespan() {
+        return lifespan;
+    }
+
     public List<ESEventDTO> getEventsInSituation() {
         return eventsInSituation;
     }
 
+    public List<OnmsAlarmSummary> getAlarmSummaries() {
+        return alarmSummaries;
+    }
+
     public String getReductionKey() {
-        return situationDtos.iterator().next().getReductionKey();
+        return firstSituationDto.getReductionKey();
+    }
+
+    public Integer getId() {
+        return firstSituationDto.getId();
+    }
+
+    public String getLogMessage() {
+        return firstSituationDto.getLogMessage();
     }
 }

@@ -30,8 +30,10 @@ package org.opennms.oce.tools.tsaudit.rest;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import javax.ws.rs.core.UriBuilder;
 
@@ -40,6 +42,8 @@ import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.opennms.oce.tools.tsaudit.NodeAndEvents;
 import org.opennms.oce.tools.tsaudit.NodeAndFacts;
+import org.opennms.oce.tools.tsaudit.SituationAndEvents;
+import org.opennms.oce.tools.tsaudit.TicketAndEvents;
 
 public class RestServer {
     static final URI BASE_URI = getBaseURI();
@@ -50,10 +54,15 @@ public class RestServer {
 
     private final List<NodeAndFacts> nodesAndFacts;
     private final List<NodeAndEvents> allNodesAndEvents;
+    private final Map<Integer, List<TicketAndEvents>> allTicketAndEvents;
+    private final Map<Integer, List<SituationAndEvents>> allSituationAndEvents;
 
-    public RestServer(List<NodeAndFacts> nodesAndFacts, List<NodeAndEvents> allNodesAndEvents) {
+    public RestServer(List<NodeAndFacts> nodesAndFacts, List<NodeAndEvents> allNodesAndEvents,
+                      Map<Integer, List<TicketAndEvents>> allTicketAndEvents, Map<Integer, List<SituationAndEvents>> allSituationAndEvents) {
         this.nodesAndFacts = nodesAndFacts;
         this.allNodesAndEvents = allNodesAndEvents;
+        this.allTicketAndEvents = allTicketAndEvents;
+        this.allSituationAndEvents = allSituationAndEvents;
     }
 
     public void startAndBlock() throws IOException {
@@ -78,5 +87,13 @@ public class RestServer {
 
     public List<NodeAndEvents> getAllNodesAndEvents() {
         return allNodesAndEvents;
+    }
+
+    public Map<Integer, List<TicketAndEvents>> getAllTicketAndEvents() {
+        return allTicketAndEvents;
+    }
+
+    public Map<Integer, List<SituationAndEvents>> getAllSituationAndEvents() {
+        return allSituationAndEvents;
     }
 }

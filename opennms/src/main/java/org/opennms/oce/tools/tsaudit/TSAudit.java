@@ -40,6 +40,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -130,14 +131,12 @@ public class TSAudit {
                 .collect(Collectors.toList());
 
         final List<NodeAndEvents> allNodesAndEvents = new LinkedList<>();
+        final Map<Integer, List<TicketAndEvents>> allTicketAndEvents = new HashMap<>();
+        final Map<Integer, List<SituationAndEvents>> allSituationAndEvents = new HashMap<>();
+
         for (NodeAndFacts nodeAndFacts : nodesToProcess) {
             // Gather all the events of interest for the node we want to process
             final NodeAndEvents nodeAndEvents = retrieveAndPairEvents(nodeAndFacts);
-
-            if (restServerEnabled) {
-                // Only keep these around if we need to
-                allNodesAndEvents.add(nodeAndEvents);
-            }
 
             // Print the matches
             printEventMatches(nodeAndEvents.getMatchedTraps(), nodeAndEvents.getCpnTrapEvents(), nodeAndEvents.getOnmsTrapEvents());
@@ -152,10 +151,18 @@ public class TSAudit {
             // Match
             final List<SituationMatchResult> matchResults = match(nodeAndEvents, ticketsAndEvents, situationsAndEvents);
             printSituationMatches(matchResults);
+
+            if (restServerEnabled) {
+                // Only keep these around if we need to
+                allNodesAndEvents.add(nodeAndEvents);
+                final int nodeId = nodeAndEvents.getNodeAndFacts().getOpennmsNodeId();
+                allTicketAndEvents.put(nodeId, ticketsAndEvents);
+                allSituationAndEvents.put(nodeId, situationsAndEvents);
+            }
         }
 
         if (restServerEnabled) {
-            final RestServer restServer = new RestServer(nodesAndFacts, allNodesAndEvents);
+            final RestServer restServer = new RestServer(nodesAndFacts, allNodesAndEvents, allTicketAndEvents, allSituationAndEvents);
             restServer.startAndBlock();
         }
     }
@@ -266,7 +273,7 @@ public class TSAudit {
                 .collect(groupingBy(AlarmDocumentDTO::getId));
 
         // Group the alarms by alarm id
-        final Map<Integer, List<AlarmDocumentDTO>> alarmsByReductionKey = alarmDtos.stream()
+        final Map<Integer, List<AlarmDocumentDTO>> alarmsById = alarmDtos.stream()
                 .collect(groupingBy(AlarmDocumentDTO::getId));
 
         // Group the events by reduction key
@@ -281,6 +288,8 @@ public class TSAudit {
         // Process each situation
         final List<SituationAndEvents> situationsAndEvents = new LinkedList<>();
         for (List<AlarmDocumentDTO> situationDtos : situationsById.values()) {
+            final Lifespan situationLifespan = getLifespan(situationDtos, startMs, endMs);
+            final List<OnmsAlarmSummary> alarmSummaries = new LinkedList<>();
             final String situationReductionKey = situationDtos.get(0).getReductionKey();
             // Gather all of the related alarm ids
             final Set<Integer> relatedAlarmIds = situationDtos.stream()
@@ -292,7 +301,7 @@ public class TSAudit {
             final List<ESEventDTO> allEventsInSituation = new LinkedList<>();
             for (Integer relatedAlarmId : relatedAlarmIds) {
                 // For every related alarm, determine it's lifespan
-                final List<AlarmDocumentDTO> relatedAlarmDtos = alarmsByReductionKey.getOrDefault(relatedAlarmId, Collections.emptyList());
+                final List<AlarmDocumentDTO> relatedAlarmDtos = alarmsById.getOrDefault(relatedAlarmId, Collections.emptyList());
                 if (relatedAlarmDtos.isEmpty()) {
                     LOG.warn("No alarms documents found for related alarm id: {} on situation with reduction key: {}",
                             relatedAlarmId, situationReductionKey);
@@ -323,6 +332,11 @@ public class TSAudit {
                 }
 
                 allEventsInSituation.addAll(eventsInAlarm);
+
+                // Build the alarm summary
+                final String logMessage = relatedAlarmDtos.iterator().next().getLogMessage();
+                final OnmsAlarmSummary alarmSummary = new OnmsAlarmSummary(relatedAlarmId, relatedReductionKey, alarmLifespan, logMessage, eventsInAlarm);
+                alarmSummaries.add(alarmSummary);
             }
 
             if (!didFindAlarmDocumentsForAtLeaseOneRelatedAlarm) {
@@ -333,7 +347,7 @@ public class TSAudit {
                 continue;
             }
 
-            situationsAndEvents.add(new SituationAndEvents(situationDtos, allEventsInSituation));
+            situationsAndEvents.add(new SituationAndEvents(situationDtos, situationLifespan, allEventsInSituation, alarmSummaries));
         }
         return situationsAndEvents;
     }
