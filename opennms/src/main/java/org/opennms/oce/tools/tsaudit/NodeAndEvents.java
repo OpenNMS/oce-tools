@@ -110,4 +110,23 @@ public class NodeAndEvents {
         matchedEvents.putAll(matchedTraps);
         return matchedEvents;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        NodeAndEvents that = (NodeAndEvents) o;
+        return Objects.equals(nodeAndFacts, that.nodeAndFacts) &&
+                Objects.equals(cpnSyslogEvents, that.cpnSyslogEvents) &&
+                Objects.equals(onmsSyslogEvents, that.onmsSyslogEvents) &&
+                Objects.equals(matchedSyslogs, that.matchedSyslogs) &&
+                Objects.equals(cpnTrapEvents, that.cpnTrapEvents) &&
+                Objects.equals(onmsTrapEvents, that.onmsTrapEvents) &&
+                Objects.equals(matchedTraps, that.matchedTraps);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(nodeAndFacts, cpnSyslogEvents, onmsSyslogEvents, matchedSyslogs, cpnTrapEvents, onmsTrapEvents, matchedTraps);
+    }
 }

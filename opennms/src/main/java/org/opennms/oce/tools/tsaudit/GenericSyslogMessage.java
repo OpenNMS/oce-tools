@@ -41,11 +41,17 @@ public class GenericSyslogMessage {
     private final String message;
     private final Date date;
 
-    private GenericSyslogMessage(String id, String host, String detailedDescription) throws ExecutionException,
-            InterruptedException {
+    private GenericSyslogMessage(String id, String host, String detailedDescription) {
         this.id = id;
         this.host = host;
-        SyslogMessage syslogMessage = SyslogParser.parse(detailedDescription);
+        SyslogMessage syslogMessage;
+
+        try {
+            syslogMessage = SyslogParser.parse(detailedDescription);
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+
         this.message = Objects.requireNonNull(syslogMessage.getMessage());
         this.date = Objects.requireNonNull(syslogMessage.getDate());
     }
@@ -57,8 +63,7 @@ public class GenericSyslogMessage {
         this.date = date;
     }
 
-    public static GenericSyslogMessage fromCpn(String id, String host, String detailedDescription) throws ExecutionException,
-            InterruptedException {
+    public static GenericSyslogMessage fromCpn(String id, String host, String detailedDescription) {
         return new GenericSyslogMessage(Objects.requireNonNull(id), Objects.requireNonNull(host),
                 Objects.requireNonNull(detailedDescription));
     }

@@ -270,7 +270,7 @@ public class TicketMatcher {
 
     private long endMs;
 
-    private NodeAndEvents retrieveAndPairEvents(NodeAndFacts nodeAndFacts) throws IOException, ExecutionException, InterruptedException {
+    private NodeAndEvents retrieveAndPairEvents(NodeAndFacts nodeAndFacts) throws IOException {
         final List<EventRecord> cpnSyslogEvents = new ArrayList<>();
         final List<TrapRecord> cpnTrapEvents = new ArrayList<>();
         final List<ESEventDTO> onmsTrapEvents = new ArrayList<>();
@@ -409,12 +409,9 @@ public class TicketMatcher {
                 Date messageTime;
 
                 // Parse the syslog record and extract the date from the message
-                try {
-                    GenericSyslogMessage parsedSyslogMessage = GenericSyslogMessage.fromCpn(syslog.getEventId(), nodeAndFacts.getCpnHostname(), syslog.getDetailedDescription());
-                    messageTime = parsedSyslogMessage.getDate();
-                } catch (ExecutionException | InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+                GenericSyslogMessage parsedSyslogMessage = GenericSyslogMessage.fromCpn(syslog.getEventId(),
+                        nodeAndFacts.getCpnHostname(), syslog.getDetailedDescription());
+                messageTime = parsedSyslogMessage.getDate();
 
                 // Compute the delta between the message date, and the time at which the event was processed
                 deltas.add(Math.abs(processedTime.getTime() - messageTime.getTime()));
