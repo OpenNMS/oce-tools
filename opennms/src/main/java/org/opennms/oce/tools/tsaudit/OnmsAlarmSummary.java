@@ -38,6 +38,8 @@ public class OnmsAlarmSummary {
     private final Lifespan lifespan;
     private final String logMessage;
     private final List<ESEventDTO> events;
+    
+    // TODO: set the mo instance and type
 
     public OnmsAlarmSummary(int id, String reductionKey, Lifespan lifespan, String logMessage, List<ESEventDTO> events) {
         this.id = id;

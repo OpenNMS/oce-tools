@@ -64,6 +64,12 @@ public class ESEventDTO {
     @SerializedName("alarmclearkey")
     private String alarmClearKey;
 
+    @SerializedName("p_ifDescr")
+    private String p_ifDescr;
+
+    @SerializedName("p_bgpPeer")
+    private String p_bgpPeer;
+
     public String getNodeLabel() {
         return nodeLabel;
     }
@@ -149,6 +155,22 @@ public class ESEventDTO {
         this.alarmClearKey = alarmClearKey;
     }
 
+    public String getP_ifDescr() {
+        return p_ifDescr;
+    }
+
+    public void setP_ifDescr(String p_ifDescr) {
+        this.p_ifDescr = p_ifDescr;
+    }
+
+    public String getP_bgpPeer() {
+        return p_bgpPeer;
+    }
+
+    public void setP_bgpPeer(String p_bgpPeer) {
+        this.p_bgpPeer = p_bgpPeer;
+    }
+
     @Override
     public String toString() {
         return "ESEventDTO{" +
@@ -161,6 +183,8 @@ public class ESEventDTO {
                 ", p_oids=" + p_oids +
                 ", alarmReductionKey='" + alarmReductionKey + '\'' +
                 ", alarmClearKey='" + alarmClearKey + '\'' +
+                ", p_ifDescr='" + p_ifDescr + '\'' +
+                ", p_bgpPeer='" + p_bgpPeer + '\'' +
                 '}';
     }
 }

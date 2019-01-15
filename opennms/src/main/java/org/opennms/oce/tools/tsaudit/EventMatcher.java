@@ -62,8 +62,7 @@ public class EventMatcher {
     @VisibleForTesting
     static final Set<Integer> alreadyMatchedOnmsEvents = new HashSet<>();
 
-    public static Map<String, Integer> matchSyslogEventsScopedByTimeAndHost(List<? extends MatchingSyslogEventRecord> cpnSyslogs, List<ESEventDTO> onmsSyslogs)
-            throws ExecutionException, InterruptedException {
+    public static Map<String, Integer> matchSyslogEventsScopedByTimeAndHost(List<? extends MatchingSyslogEventRecord> cpnSyslogs, List<ESEventDTO> onmsSyslogs) {
         // Group the syslogs by node
         List<GenericSyslogMessage> genericCpnSyslogs = mapSyslogMessagesFromCpn(cpnSyslogs);
         List<GenericSyslogMessage> genericOnmsSyslogs = mapSyslogMessagesFromOnms(onmsSyslogs);
@@ -160,7 +159,7 @@ public class EventMatcher {
         return Collections.unmodifiableMap(cpnEventIdToOnmsEventId);
     }
 
-    private static List<GenericSyslogMessage> mapSyslogMessagesFromCpn(List<? extends MatchingSyslogEventRecord> syslogEvents) throws ExecutionException, InterruptedException {
+    private static List<GenericSyslogMessage> mapSyslogMessagesFromCpn(List<? extends MatchingSyslogEventRecord> syslogEvents) {
         List<GenericSyslogMessage> genericSyslogMessages = new ArrayList<>();
 
         for (MatchingSyslogEventRecord syslogEvent : syslogEvents) {

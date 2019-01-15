@@ -52,7 +52,7 @@ public class GenericSyslogMessageTest {
     private static final Integer onmsId = 1;
 
     @Test
-    public void testCompare() throws ExecutionException, InterruptedException, ParseException {
+    public void testCompare() throws ParseException {
         GenericSyslogMessage messageFromCpn = GenericSyslogMessage.fromCpn("id", host, syslogMessageString);
         Date currentDate = new Date();
         // prepend the year since parser assumes current year
