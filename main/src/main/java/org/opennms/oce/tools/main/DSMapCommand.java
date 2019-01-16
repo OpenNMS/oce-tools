@@ -34,6 +34,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.kohsuke.args4j.Option;
+import org.opennms.oce.tools.NodeAndFactsGenerator;
 import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.dsmapping.DSMapper;
 import org.opennms.oce.tools.es.ESClient;
@@ -61,7 +62,8 @@ public class DSMapCommand extends AbstractCommand {
         ESClient esClient = context.getEsClient();
         ESDataProvider esDataProvider = new ESDataProvider(esClient);
         EventClient eventClient = new EventClient(esClient);
-        DSMapper dsMapper = new DSMapper(esDataProvider, eventClient, Paths.get(cpnDir), Paths.get(onmsDir), Paths.get(outputDir));
+        DSMapper dsMapper = new DSMapper(esDataProvider, eventClient, Paths.get(cpnDir), Paths.get(onmsDir),
+                Paths.get(outputDir), NodeAndFactsGenerator::newBuilder);
         dsMapper.run();
     }
 }

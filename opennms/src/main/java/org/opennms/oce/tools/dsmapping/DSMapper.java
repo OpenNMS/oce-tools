@@ -34,6 +34,7 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import javax.xml.bind.JAXBContext;
@@ -69,10 +71,14 @@ import org.opennms.oce.tools.tsaudit.TSAudit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.annotations.VisibleForTesting;
+
 public class DSMapper {
     private static final Logger LOG = LoggerFactory.getLogger(DSMapper.class);
-    private static final String CPN_ALARMS_FILE = "cpn.alarms.xml";
-    private static final String ONMS_ALARMS_FILE = "cpn.alarms.xml";
+    @VisibleForTesting
+    static final String CPN_ALARMS_FILE = "cpn.alarms.xml";
+    @VisibleForTesting
+    static final String ONMS_ALARMS_FILE = "onms.alarms.xml";
     private static final String CPN_SITUATIONS_FILE = "cpn.situations.xml";
     private static final String ONMS_SITUATIONS_FILE = "onms.situations.xml";
 
@@ -83,17 +89,20 @@ public class DSMapper {
 
     private final ESDataProvider esDataProvider;
     private final EventClient eventClient;
+    private final Supplier<NodeAndFactsGenerator.NodeAndFactsGeneratorBuilder> nodeAndFactsGeneratorBuilderSupplier;
     private final Path cpnPath;
     private final Path onmsPath;
     private final Path outputPath;
 
     public DSMapper(ESDataProvider esDataProvider, EventClient eventClient, Path cpnPath, Path onmsPath,
-                    Path outputPath) {
+                    Path outputPath,
+                    Supplier<NodeAndFactsGenerator.NodeAndFactsGeneratorBuilder> nodeAndFactsGeneratorBuilderSupplier) {
         this.esDataProvider = Objects.requireNonNull(esDataProvider);
         this.eventClient = Objects.requireNonNull(eventClient);
         this.cpnPath = Objects.requireNonNull(cpnPath);
         this.onmsPath = Objects.requireNonNull(onmsPath);
         this.outputPath = Objects.requireNonNull(outputPath);
+        this.nodeAndFactsGeneratorBuilderSupplier = Objects.requireNonNull(nodeAndFactsGeneratorBuilderSupplier);
     }
 
     public void run() throws IOException, JAXBException {
@@ -109,18 +118,25 @@ public class DSMapper {
         processInventory();
     }
 
-    private Map<String, String> processAlarms(Unmarshaller unmarshaller, Marshaller marshaller) throws IOException,
+    @VisibleForTesting
+    Map<String, String> processAlarms(Unmarshaller unmarshaller, Marshaller marshaller) throws IOException,
             JAXBException {
         // Extract all of the alarm objects from both alarm xml files
-        Alarms cpnAlarms = (Alarms) unmarshaller.unmarshal(Paths.get(cpnPath.toString(), CPN_ALARMS_FILE).toFile());
-        Alarms onmsAlarms = (Alarms) unmarshaller.unmarshal(Paths.get(onmsPath.toString(), ONMS_ALARMS_FILE).toFile());
+        Alarms cpnAlarms = Objects.requireNonNull((Alarms) unmarshaller.unmarshal(Paths.get(cpnPath.toString(),
+                CPN_ALARMS_FILE).toFile()));
+        Alarms onmsAlarms = Objects.requireNonNull((Alarms) unmarshaller.unmarshal(Paths.get(onmsPath.toString(),
+                ONMS_ALARMS_FILE).toFile()));
+
+        if (cpnAlarms.getAlarm().isEmpty() || onmsAlarms.getAlarm().isEmpty()) {
+            return Collections.emptyMap();
+        }
 
         // Find a time window bounded by the first event and last event considering events in both files
         // Use that time window to search for all of the events in the window and pair them up and then group them by
         // node
         ZonedDateTime start = findFirstAlarmTime(cpnAlarms, onmsAlarms);
         ZonedDateTime end = findLastAlarmTime(cpnAlarms, onmsAlarms);
-        NodeAndFactsGenerator nodeAndFactsGenerator = NodeAndFactsGenerator.newBuilder()
+        NodeAndFactsGenerator nodeAndFactsGenerator = nodeAndFactsGeneratorBuilderSupplier.get()
                 .setCpnEventExcludes(TSAudit.cpnEventExcludes)
                 .setStart(start)
                 .setEnd(end)
