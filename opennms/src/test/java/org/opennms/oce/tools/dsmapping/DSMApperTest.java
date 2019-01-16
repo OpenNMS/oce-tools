@@ -59,9 +59,13 @@ import org.mockito.Matchers;
 import org.opennms.oce.datasource.v1.schema.Alarm;
 import org.opennms.oce.datasource.v1.schema.AlarmMap;
 import org.opennms.oce.datasource.v1.schema.AlarmMapping;
+import org.opennms.oce.datasource.v1.schema.AlarmRef;
 import org.opennms.oce.datasource.v1.schema.Alarms;
 import org.opennms.oce.datasource.v1.schema.Event;
+import org.opennms.oce.datasource.v1.schema.Situation;
 import org.opennms.oce.datasource.v1.schema.SituationMap;
+import org.opennms.oce.datasource.v1.schema.SituationMapping;
+import org.opennms.oce.datasource.v1.schema.Situations;
 import org.opennms.oce.tools.NodeAndFactsGenerator;
 import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.onms.client.EventClient;
@@ -100,6 +104,24 @@ public class DSMApperTest {
         put("6", new HashSet<>(Arrays.asList("12", "14", "16", "18")));
     }};
 
+    private final Map<String, String> alarmIdMap = new HashMap<String, String>() {{
+        put("1", "2");
+        put("7", "8");
+        put("9", "10");
+        put("11", "12");
+        put("13", "14");
+    }};
+
+    private final Map<String, Set<String>> cpnTicketAlarms = new HashMap<String, Set<String>>() {{
+        put("1", new HashSet<>(Arrays.asList("1", "7")));
+        put("3", new HashSet<>(Arrays.asList("9", "11")));
+    }};
+
+    private final Map<String, Set<String>> onmsSituationAlarms = new HashMap<String, Set<String>>() {{
+        put("2", new HashSet<>(Arrays.asList("2", "8")));
+        put("4", new HashSet<>(Arrays.asList("10", "14")));
+    }};
+
     private static final String mockPathCpn = "/tmp/cpn";
     private static final String mockPathOnms = "/tmp/onms";
     private static final String mockPathOut = "/tmp/out";
@@ -123,6 +145,10 @@ public class DSMApperTest {
                 .thenReturn(getMockCpnAlarms());
         when(mockUnMarshaller.unmarshal(Paths.get(mockPathOnms, DSMapper.ONMS_ALARMS_FILE).toFile()))
                 .thenReturn(getMockOnmsAlarms());
+        when(mockUnMarshaller.unmarshal(Paths.get(mockPathCpn, DSMapper.CPN_SITUATIONS_FILE).toFile()))
+                .thenReturn(getMockCpnSituations());
+        when(mockUnMarshaller.unmarshal(Paths.get(mockPathOnms, DSMapper.ONMS_SITUATIONS_FILE).toFile()))
+                .thenReturn(getMockOnmsSituations());
         dsMapper = new DSMapper(mock(ESDataProvider.class), mock(EventClient.class), Paths.get(mockPathCpn),
                 Paths.get(mockPathOnms), Paths.get(mockPathOut), () -> mockNAFBuilder);
     }
@@ -137,14 +163,20 @@ public class DSMApperTest {
         expectedMapping.setCpnAlarmId("1");
         expectedMapping.setOnmsAlarmId("2");
         assertThat(alarmMap.getAlarmMapping().contains(expectedMapping), equalTo(true));
-
         assertThat(alarmMap.getAlarmMapping(), hasSize(1));
     }
 
     @Test
-    public void canMapSituations() throws IOException, JAXBException {
+    public void canMapSituations() throws JAXBException {
         ArgumentCaptor<SituationMap> captor = ArgumentCaptor.forClass(SituationMap.class);
-        // TODO
+        dsMapper.processSituations(mockUnMarshaller, alarmIdMap, mockMarshaller);
+        verify(mockMarshaller, times(1)).marshal(captor.capture(), Matchers.any(File.class));
+        SituationMap situationMap = captor.getValue();
+        SituationMapping expectedMapping = new SituationMapping();
+        expectedMapping.setCpnTicketId("1");
+        expectedMapping.setOnmsSituationId("2");
+        assertThat(situationMap.getSituationMapping().contains(expectedMapping), equalTo(true));
+        assertThat(situationMap.getSituationMapping(), hasSize(1));
     }
 
     private Alarms getMockCpnAlarms() {
@@ -202,5 +234,43 @@ public class DSMApperTest {
         when(nodeAndEvents.getMatchedEvents()).thenReturn(matchingEvents);
 
         return nodeAndEvents;
+    }
+
+    private Situations getMockCpnSituations() {
+        Situations cpnSituations = new Situations();
+
+        cpnTicketAlarms.forEach((id, alarmIds) -> {
+            Situation situation = new Situation();
+            situation.setId(id);
+
+            alarmIds.forEach(alarmId -> {
+                AlarmRef alarmRef = new AlarmRef();
+                alarmRef.setId(alarmId);
+                situation.getAlarmRef().add(alarmRef);
+            });
+
+            cpnSituations.getSituation().add(situation);
+        });
+
+        return cpnSituations;
+    }
+
+    private Situations getMockOnmsSituations() {
+        Situations onmsSituations = new Situations();
+
+        onmsSituationAlarms.forEach((id, alarmIds) -> {
+            Situation situation = new Situation();
+            situation.setId(id);
+
+            alarmIds.forEach(alarmId -> {
+                AlarmRef alarmRef = new AlarmRef();
+                alarmRef.setId(alarmId);
+                situation.getAlarmRef().add(alarmRef);
+            });
+
+            onmsSituations.getSituation().add(situation);
+        });
+
+        return onmsSituations;
     }
 }

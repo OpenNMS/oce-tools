@@ -79,8 +79,10 @@ public class DSMapper {
     static final String CPN_ALARMS_FILE = "cpn.alarms.xml";
     @VisibleForTesting
     static final String ONMS_ALARMS_FILE = "onms.alarms.xml";
-    private static final String CPN_SITUATIONS_FILE = "cpn.situations.xml";
-    private static final String ONMS_SITUATIONS_FILE = "onms.situations.xml";
+    @VisibleForTesting
+    static final String CPN_SITUATIONS_FILE = "cpn.situations.xml";
+    @VisibleForTesting
+    static final String ONMS_SITUATIONS_FILE = "onms.situations.xml";
 
     private static final String ALARM_MAP_FILE = "alarmMap.xml";
     private static final String SITUATION_MAP_FILE = "situationMap.xml";
@@ -163,7 +165,8 @@ public class DSMapper {
         return cpnAlarmIdToOnmsAlarmId;
     }
 
-    private void processSituations(Unmarshaller unmarshaller, Map<String, String> cpnAlarmIdToOnmsAlarmId,
+    @VisibleForTesting
+    void processSituations(Unmarshaller unmarshaller, Map<String, String> cpnAlarmIdToOnmsAlarmId,
                                    Marshaller marshaller) throws JAXBException {
         Situations cpnSituations = (Situations) unmarshaller.unmarshal(Paths.get(cpnPath.toString(),
                 CPN_SITUATIONS_FILE).toFile());
