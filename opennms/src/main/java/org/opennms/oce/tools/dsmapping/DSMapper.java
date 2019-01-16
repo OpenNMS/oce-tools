@@ -40,17 +40,25 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
+import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 
 import org.opennms.oce.datasource.v1.schema.Alarm;
+import org.opennms.oce.datasource.v1.schema.AlarmMap;
+import org.opennms.oce.datasource.v1.schema.AlarmMapping;
+import org.opennms.oce.datasource.v1.schema.AlarmRef;
 import org.opennms.oce.datasource.v1.schema.Alarms;
 import org.opennms.oce.datasource.v1.schema.Event;
 import org.opennms.oce.datasource.v1.schema.Inventory;
 import org.opennms.oce.datasource.v1.schema.MetaModel;
+import org.opennms.oce.datasource.v1.schema.Situation;
+import org.opennms.oce.datasource.v1.schema.SituationMap;
+import org.opennms.oce.datasource.v1.schema.SituationMapping;
 import org.opennms.oce.datasource.v1.schema.Situations;
 import org.opennms.oce.tools.NodeAndFactsGenerator;
 import org.opennms.oce.tools.cpn.ESDataProvider;
@@ -65,6 +73,12 @@ public class DSMapper {
     private static final Logger LOG = LoggerFactory.getLogger(DSMapper.class);
     private static final String CPN_ALARMS_FILE = "cpn.alarms.xml";
     private static final String ONMS_ALARMS_FILE = "cpn.alarms.xml";
+    private static final String CPN_SITUATIONS_FILE = "cpn.situations.xml";
+    private static final String ONMS_SITUATIONS_FILE = "onms.situations.xml";
+
+    private static final String ALARM_MAP_FILE = "alarmMap.xml";
+    private static final String SITUATION_MAP_FILE = "situationMap.xml";
+    private static final String INVENTORY_MAP_FILE = "inventoryMap.xml";
 
 
     private final ESDataProvider esDataProvider;
@@ -83,15 +97,20 @@ public class DSMapper {
     }
 
     public void run() throws IOException, JAXBException {
-
-        JAXBContext jaxbContext = JAXBContext.newInstance(MetaModel.class, Inventory.class, Alarms.class,
+        JAXBContext jaxbUnmarshalContext = JAXBContext.newInstance(MetaModel.class, Inventory.class, Alarms.class,
                 Situations.class);
-        Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
-        processAlarms(unmarshaller);
+        Unmarshaller unmarshaller = jaxbUnmarshalContext.createUnmarshaller();
+        JAXBContext jaxbMarshalContext = JAXBContext.newInstance(AlarmMap.class, SituationMap.class);
+        Marshaller marshaller = jaxbMarshalContext.createMarshaller();
+        marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+
+        Map<String, String> cpnAlarmIdToOnmsAlarmId = processAlarms(unmarshaller, marshaller);
+        processSituations(unmarshaller, cpnAlarmIdToOnmsAlarmId, marshaller);
         processInventory();
     }
 
-    private void processAlarms(Unmarshaller unmarshaller) throws IOException, JAXBException {
+    private Map<String, String> processAlarms(Unmarshaller unmarshaller, Marshaller marshaller) throws IOException,
+            JAXBException {
         // Extract all of the alarm objects from both alarm xml files
         Alarms cpnAlarms = (Alarms) unmarshaller.unmarshal(Paths.get(cpnPath.toString(), CPN_ALARMS_FILE).toFile());
         Alarms onmsAlarms = (Alarms) unmarshaller.unmarshal(Paths.get(onmsPath.toString(), ONMS_ALARMS_FILE).toFile());
@@ -112,6 +131,44 @@ public class DSMapper {
 
         // Now attempt to pair up alarms from the alarm xml content by using the event pairings
         Map<String, String> cpnAlarmIdToOnmsAlarmId = mapAlarms(cpnAlarms, onmsAlarms, nodeAndEvents);
+
+        // Record the results to the output file
+        AlarmMap alarmMap = new AlarmMap();
+
+        cpnAlarmIdToOnmsAlarmId.forEach((cpnId, onmsId) -> {
+            AlarmMapping alarmMapping = new AlarmMapping();
+            alarmMapping.setCpnAlarmId(cpnId);
+            alarmMapping.setOnmsAlarmId(onmsId);
+            alarmMap.getAlarmMapping().add(alarmMapping);
+        });
+
+        marshaller.marshal(alarmMap, Paths.get(outputPath.toString(), ALARM_MAP_FILE).toFile());
+
+        return cpnAlarmIdToOnmsAlarmId;
+    }
+
+    private void processSituations(Unmarshaller unmarshaller, Map<String, String> cpnAlarmIdToOnmsAlarmId,
+                                   Marshaller marshaller) throws JAXBException {
+        Situations cpnSituations = (Situations) unmarshaller.unmarshal(Paths.get(cpnPath.toString(),
+                CPN_SITUATIONS_FILE).toFile());
+        Situations onmsSituations = (Situations) unmarshaller.unmarshal(Paths.get(onmsPath.toString(),
+                ONMS_SITUATIONS_FILE).toFile());
+
+        Map<String, String> onmsAlarmIdToSituationId = mapAlarmsToSituations(onmsSituations);
+        Map<String, String> cpnTicketIdToOnmsSituationId = mapSituations(cpnSituations, cpnAlarmIdToOnmsAlarmId,
+                onmsAlarmIdToSituationId);
+
+        // Record the results to the output file
+        SituationMap situationMap = new SituationMap();
+
+        cpnTicketIdToOnmsSituationId.forEach((cpnId, onmsId) -> {
+            SituationMapping situationMapping = new SituationMapping();
+            situationMapping.setCpnTicketId(cpnId);
+            situationMapping.setOnmsSituationId(onmsId);
+            situationMap.getSituationMapping().add(situationMapping);
+        });
+
+        marshaller.marshal(situationMap, Paths.get(outputPath.toString(), SITUATION_MAP_FILE).toFile());
     }
 
     private void processInventory() {
@@ -173,6 +230,7 @@ public class DSMapper {
         // Map all of the events in the onms alarms xml to their containing alarm
         Map<String, String> onmsEventsToOnmsAlarms = mapEventsToAlarms(alarmsFromOnms);
         // Retrieve all of the matching events
+        // TODO: We may want to record this to XML as well
         Map<String, Integer> allMatchedEvents = getAllMatchedEvents(nodeToNodeAndEvents);
 
         Map<String, String> cpnAlarmIdToOnmsAlarmId = new HashMap<>();
@@ -245,5 +303,56 @@ public class DSMapper {
         Map<String, Integer> allMatchedEvents = new HashMap<>();
         nodeToNodeAndEvents.values().forEach(nodeAndEvents -> allMatchedEvents.putAll(nodeAndEvents.getMatchedEvents()));
         return allMatchedEvents;
+    }
+
+    private Map<String, String> mapAlarmsToSituations(Situations situations) {
+        Map<String, String> alarmIdsToSituationIds = new HashMap<>();
+
+        for (Situation situation : situations.getSituation()) {
+            for (AlarmRef alarmRef : situation.getAlarmRef()) {
+                alarmIdsToSituationIds.put(alarmRef.getId(), situation.getId());
+            }
+        }
+
+        return alarmIdsToSituationIds;
+    }
+
+    private Map<String, String> mapSituations(Situations cpnSituations, Map<String, String> cpnAlarmIdToOnmsAlarmId,
+                                              Map<String, String> onmsAlarmIdToSituationId) {
+        Map<String, String> cpnSituationIdToOnmsSituationId = new HashMap<>();
+
+        for (Situation cpnTicket : cpnSituations.getSituation()) {
+            // Iterate over the alarms in this ticket and for each find the situation they map to by using the alarm
+            // to situation map
+            Set<String> mappedSituationId = cpnTicket.getAlarmRef()
+                    .stream()
+                    .map(cpnAlarmRef -> {
+                        String onmsMatchingId = cpnAlarmIdToOnmsAlarmId.get(cpnAlarmRef.getId());
+
+                        if (onmsMatchingId != null) {
+                            return onmsAlarmIdToSituationId.get(onmsMatchingId);
+                        }
+
+                        return null;
+                    })
+                    .collect(Collectors.toSet());
+
+            // Then make sure there was only one result (all were in the same situation)
+            if (mappedSituationId.size() == 1 && !mappedSituationId.contains(null)) {
+                String onmsMappedSituationId = mappedSituationId.iterator().next();
+                long onmsAlarmsSize = onmsAlarmIdToSituationId.values()
+                        .stream()
+                        .filter(onmsSituationId -> onmsSituationId.equals(onmsMappedSituationId))
+                        .count();
+
+                // Now make sure the ticket and the situation both have the same number of alarms
+                // If they do, now we know this is an exact ticket to situation map
+                if (cpnTicket.getAlarmRef().size() == onmsAlarmsSize) {
+                    cpnSituationIdToOnmsSituationId.put(cpnTicket.getId(), onmsMappedSituationId);
+                }
+            }
+        }
+
+        return cpnSituationIdToOnmsSituationId;
     }
 }
