@@ -35,6 +35,7 @@ import static org.elasticsearch.index.query.QueryBuilders.nestedQuery;
 import static org.elasticsearch.index.query.QueryBuilders.prefixQuery;
 import static org.elasticsearch.index.query.QueryBuilders.rangeQuery;
 import static org.elasticsearch.index.query.QueryBuilders.termQuery;
+import static org.elasticsearch.index.query.QueryBuilders.termsQuery;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -44,6 +45,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -243,6 +245,35 @@ public class EventClient {
         final List<AlarmDocumentDTO> situations = new ArrayList<>();
         scroll(search, AlarmDocumentDTO.class, situations::addAll);
         return situations;
+    }
+
+    public Optional<AlarmDocumentDTO> getSituation(int situationId) throws IOException {
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(QueryBuilders.boolQuery()
+                .must(termQuery("situation", "true"))
+                .must(termQuery("id", situationId)));
+        final Search search = new Search.Builder(searchSourceBuilder.toString())
+                .addIndex(esClusterConfiguration.getOpennmsAlarmIndex())
+                .setParameter(Parameters.SCROLL, "5m")
+                .build();
+
+        final List<AlarmDocumentDTO> situations = new ArrayList<>();
+        scroll(search, AlarmDocumentDTO.class, situations::addAll);
+        return situations.stream().findFirst();
+    }
+
+    public List<AlarmDocumentDTO> getAlarms(Set<Integer> alarmIds) throws IOException {
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(QueryBuilders.boolQuery()
+                .must(termsQuery("id", alarmIds)));
+        final Search search = new Search.Builder(searchSourceBuilder.toString())
+                .addIndex(esClusterConfiguration.getOpennmsAlarmIndex())
+                .setParameter(Parameters.SCROLL, "5m")
+                .build();
+
+        final List<AlarmDocumentDTO> alarms = new ArrayList<>();
+        scroll(search, AlarmDocumentDTO.class, alarms::addAll);
+        return alarms;
     }
 
     public List<AlarmDocumentDTO> getAlarmsOnNodeId(long startMs, long endMs, int nodeId) throws IOException {

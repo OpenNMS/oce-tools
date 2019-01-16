@@ -56,7 +56,6 @@ import org.opennms.oce.tools.cpn.model.TicketRecord;
 import org.opennms.oce.tools.cpn.view.CpnDatasetViewer;
 import org.opennms.oce.tools.cpn2oce.model.EventDefinition;
 import org.opennms.oce.tools.cpn2oce.model.ModelObject;
-import org.opennms.oce.tools.cpn2oce.model.ModelObjectKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
