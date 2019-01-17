@@ -165,6 +165,12 @@ public class DSMApperTest {
         assertThat(alarmMap.getAlarmMapping().contains(expectedMapping), equalTo(true));
         assertThat(alarmMap.getAlarmMapping(), hasSize(1));
     }
+    
+    @Test
+    public void canMapEvents() throws JAXBException {
+        // TODO
+        dsMapper.processEvents(null, null, null, null);
+    }
 
     @Test
     public void canMapSituations() throws JAXBException {
@@ -177,6 +183,12 @@ public class DSMApperTest {
         expectedMapping.setOnmsSituationId("2");
         assertThat(situationMap.getSituationMapping().contains(expectedMapping), equalTo(true));
         assertThat(situationMap.getSituationMapping(), hasSize(1));
+    }
+    
+    @Test
+    public void canMapInventory() throws JAXBException {
+        // TODO
+        dsMapper.processInventory(null, null, null, null);
     }
 
     private Alarms getMockCpnAlarms() {

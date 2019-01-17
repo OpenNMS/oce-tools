@@ -34,6 +34,7 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -43,6 +44,8 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import javax.xml.bind.JAXBContext;
@@ -56,14 +59,20 @@ import org.opennms.oce.datasource.v1.schema.AlarmMapping;
 import org.opennms.oce.datasource.v1.schema.AlarmRef;
 import org.opennms.oce.datasource.v1.schema.Alarms;
 import org.opennms.oce.datasource.v1.schema.Event;
+import org.opennms.oce.datasource.v1.schema.EventMap;
+import org.opennms.oce.datasource.v1.schema.EventMapping;
 import org.opennms.oce.datasource.v1.schema.Inventory;
+import org.opennms.oce.datasource.v1.schema.InventoryMap;
+import org.opennms.oce.datasource.v1.schema.InventoryMapping;
 import org.opennms.oce.datasource.v1.schema.MetaModel;
+import org.opennms.oce.datasource.v1.schema.ModelObjectEntry;
 import org.opennms.oce.datasource.v1.schema.Situation;
 import org.opennms.oce.datasource.v1.schema.SituationMap;
 import org.opennms.oce.datasource.v1.schema.SituationMapping;
 import org.opennms.oce.datasource.v1.schema.Situations;
 import org.opennms.oce.tools.NodeAndFactsGenerator;
 import org.opennms.oce.tools.cpn.ESDataProvider;
+import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
 import org.opennms.oce.tools.tsaudit.NodeAndEvents;
 import org.opennms.oce.tools.tsaudit.NodeAndFacts;
@@ -83,11 +92,15 @@ public class DSMapper {
     static final String CPN_SITUATIONS_FILE = "cpn.situations.xml";
     @VisibleForTesting
     static final String ONMS_SITUATIONS_FILE = "onms.situations.xml";
+    @VisibleForTesting
+    static final String CPN_INVENTORY_FILE = "cpn.inventory.xml";
+    @VisibleForTesting
+    static final String ONMS_INVENTORY_FILE = "onms.inventory.xml";
 
     private static final String ALARM_MAP_FILE = "alarmMap.xml";
+    private static final String EVENT_MAP_FILE = "eventMap.xml";
     private static final String SITUATION_MAP_FILE = "situationMap.xml";
     private static final String INVENTORY_MAP_FILE = "inventoryMap.xml";
-
 
     private final ESDataProvider esDataProvider;
     private final EventClient eventClient;
@@ -111,17 +124,21 @@ public class DSMapper {
         JAXBContext jaxbUnmarshalContext = JAXBContext.newInstance(MetaModel.class, Inventory.class, Alarms.class,
                 Situations.class);
         Unmarshaller unmarshaller = jaxbUnmarshalContext.createUnmarshaller();
-        JAXBContext jaxbMarshalContext = JAXBContext.newInstance(AlarmMap.class, SituationMap.class);
+        JAXBContext jaxbMarshalContext = JAXBContext.newInstance(AlarmMap.class, EventMap.class, SituationMap.class,
+                InventoryMap.class);
         Marshaller marshaller = jaxbMarshalContext.createMarshaller();
         marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
 
-        Map<String, String> cpnAlarmIdToOnmsAlarmId = processAlarms(unmarshaller, marshaller);
-        processSituations(unmarshaller, cpnAlarmIdToOnmsAlarmId, marshaller);
-        processInventory();
+        ProcessAlarmsResult processAlarmsResult = processAlarms(unmarshaller, marshaller);
+        processEvents(processAlarmsResult.nodeToNodeAndEvents, marshaller, processAlarmsResult.cpnAlarms,
+                processAlarmsResult.onmsAlarms);
+        processSituations(unmarshaller, processAlarmsResult.cpnAlarmIdToOnmsAlarmId, marshaller);
+        processInventory(unmarshaller, marshaller, processAlarmsResult.nodeToNodeAndEvents,
+                processAlarmsResult.onmsEventIdToOnmsAlarmId);
     }
 
     @VisibleForTesting
-    Map<String, String> processAlarms(Unmarshaller unmarshaller, Marshaller marshaller) throws IOException,
+    ProcessAlarmsResult processAlarms(Unmarshaller unmarshaller, Marshaller marshaller) throws IOException,
             JAXBException {
         // Extract all of the alarm objects from both alarm xml files
         Alarms cpnAlarms = Objects.requireNonNull((Alarms) unmarshaller.unmarshal(Paths.get(cpnPath.toString(),
@@ -130,7 +147,8 @@ public class DSMapper {
                 ONMS_ALARMS_FILE).toFile()));
 
         if (cpnAlarms.getAlarm().isEmpty() || onmsAlarms.getAlarm().isEmpty()) {
-            return Collections.emptyMap();
+            return new ProcessAlarmsResult(Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(),
+                    new Alarms(), new Alarms());
         }
 
         // Find a time window bounded by the first event and last event considering events in both files
@@ -145,53 +163,173 @@ public class DSMapper {
                 .setEsDataProvider(esDataProvider)
                 .setEventClient(eventClient)
                 .build();
-        Map<String, NodeAndEvents> nodeAndEvents = getNodeAndEvents(nodeAndFactsGenerator);
+        Map<String, NodeAndEvents> nodeToNodeAndEvents = getNodeAndEvents(nodeAndFactsGenerator);
 
         // Now attempt to pair up alarms from the alarm xml content by using the event pairings
-        Map<String, String> cpnAlarmIdToOnmsAlarmId = mapAlarms(cpnAlarms, onmsAlarms, nodeAndEvents);
+        Map<String, String> onmsEventsToOnmsAlarms = new HashMap<>();
+        Map<String, String> cpnAlarmIdToOnmsAlarmId = mapAlarms(cpnAlarms, onmsAlarms, nodeToNodeAndEvents,
+                onmsEventsToOnmsAlarms);
 
-        // Record the results to the output file
-        AlarmMap alarmMap = new AlarmMap();
+        if (!cpnAlarmIdToOnmsAlarmId.isEmpty()) {
+            // Record the results to the output file
+            AlarmMap alarmMap = new AlarmMap();
 
-        cpnAlarmIdToOnmsAlarmId.forEach((cpnId, onmsId) -> {
-            AlarmMapping alarmMapping = new AlarmMapping();
-            alarmMapping.setCpnAlarmId(cpnId);
-            alarmMapping.setOnmsAlarmId(onmsId);
-            alarmMap.getAlarmMapping().add(alarmMapping);
+            cpnAlarmIdToOnmsAlarmId.forEach((cpnId, onmsId) -> {
+                AlarmMapping alarmMapping = new AlarmMapping();
+                alarmMapping.setCpnAlarmId(cpnId);
+                alarmMapping.setOnmsAlarmId(onmsId);
+                alarmMap.getAlarmMapping().add(alarmMapping);
+            });
+
+            marshaller.marshal(alarmMap, Paths.get(outputPath.toString(), ALARM_MAP_FILE).toFile());
+        }
+
+        return new ProcessAlarmsResult(cpnAlarmIdToOnmsAlarmId, nodeToNodeAndEvents, onmsEventsToOnmsAlarms,
+                cpnAlarms, onmsAlarms);
+    }
+
+    @VisibleForTesting
+    void processEvents(Map<String, NodeAndEvents> nodeToNodeAndEvents, Marshaller marshaller, Alarms cpnAlarms,
+                       Alarms onmsAlarms) throws JAXBException {
+        Objects.requireNonNull(nodeToNodeAndEvents);
+
+        Map<String, Integer> allFoundMatchingEvents = new HashMap<>();
+
+        nodeToNodeAndEvents.forEach((node, nodeAndEvents) -> {
+                    Map<String, Integer> matchingEvents = nodeAndEvents.getMatchedEvents()
+                            .entrySet()
+                            .stream()
+                            .filter(entry ->
+                                    // Filter out all matching events that don't occur in the alarm XMLs we parsed
+                                    cpnAlarms.getAlarm()
+                                            .stream()
+                                            .anyMatch(cpnAlarm -> cpnAlarm.getEvent()
+                                                    .stream()
+                                                    .anyMatch(cpnEvent -> cpnEvent.getId().equals(entry.getKey()))) &&
+                                            onmsAlarms.getAlarm()
+                                                    .stream()
+                                                    .anyMatch(onmsAlarm -> onmsAlarm.getEvent()
+                                                            .stream()
+                                                            .anyMatch(onmsEvent -> onmsEvent.getId()
+                                                                    .equals(entry.getValue().toString()))))
+                            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                    allFoundMatchingEvents.putAll(matchingEvents);
+                }
+        );
+
+        if (allFoundMatchingEvents.isEmpty()) {
+            return;
+        }
+
+        EventMap eventMap = new EventMap();
+
+        allFoundMatchingEvents.forEach((cpnId, onmsId) -> {
+            EventMapping eventMapping = new EventMapping();
+            eventMapping.setCpnEventId(cpnId);
+            eventMapping.setOnmsEventId(onmsId.toString());
+            eventMap.getEventMapping().add(eventMapping);
         });
 
-        marshaller.marshal(alarmMap, Paths.get(outputPath.toString(), ALARM_MAP_FILE).toFile());
-
-        return cpnAlarmIdToOnmsAlarmId;
+        marshaller.marshal(eventMap, Paths.get(outputPath.toString(), EVENT_MAP_FILE).toFile());
     }
 
     @VisibleForTesting
     void processSituations(Unmarshaller unmarshaller, Map<String, String> cpnAlarmIdToOnmsAlarmId,
-                                   Marshaller marshaller) throws JAXBException {
+                           Marshaller marshaller) throws JAXBException {
         Situations cpnSituations = (Situations) unmarshaller.unmarshal(Paths.get(cpnPath.toString(),
                 CPN_SITUATIONS_FILE).toFile());
         Situations onmsSituations = (Situations) unmarshaller.unmarshal(Paths.get(onmsPath.toString(),
                 ONMS_SITUATIONS_FILE).toFile());
 
+        if (cpnSituations.getSituation().isEmpty() || onmsSituations.getSituation().isEmpty()) {
+            return;
+        }
+
         Map<String, String> onmsAlarmIdToSituationId = mapAlarmsToSituations(onmsSituations);
         Map<String, String> cpnTicketIdToOnmsSituationId = mapSituations(cpnSituations, cpnAlarmIdToOnmsAlarmId,
                 onmsAlarmIdToSituationId);
 
-        // Record the results to the output file
-        SituationMap situationMap = new SituationMap();
+        if (!cpnTicketIdToOnmsSituationId.isEmpty()) {
+            // Record the results to the output file
+            SituationMap situationMap = new SituationMap();
 
-        cpnTicketIdToOnmsSituationId.forEach((cpnId, onmsId) -> {
-            SituationMapping situationMapping = new SituationMapping();
-            situationMapping.setCpnTicketId(cpnId);
-            situationMapping.setOnmsSituationId(onmsId);
-            situationMap.getSituationMapping().add(situationMapping);
-        });
+            cpnTicketIdToOnmsSituationId.forEach((cpnId, onmsId) -> {
+                SituationMapping situationMapping = new SituationMapping();
+                situationMapping.setCpnTicketId(cpnId);
+                situationMapping.setOnmsSituationId(onmsId);
+                situationMap.getSituationMapping().add(situationMapping);
+            });
 
-        marshaller.marshal(situationMap, Paths.get(outputPath.toString(), SITUATION_MAP_FILE).toFile());
+            marshaller.marshal(situationMap, Paths.get(outputPath.toString(), SITUATION_MAP_FILE).toFile());
+        }
     }
 
-    private void processInventory() {
-        // TODO
+    @VisibleForTesting
+    void processInventory(Unmarshaller unmarshaller, Marshaller marshaller,
+                          Map<String, NodeAndEvents> nodeToNodeAndEvents,
+                          Map<String, String> onmsEventIdToOnmsAlarmId) throws JAXBException {
+        // Verify nodeAndEvents was populated earlier as a result of the alarm mapping, we will re-use it here
+        Objects.requireNonNull(nodeToNodeAndEvents);
+        Objects.requireNonNull(onmsEventIdToOnmsAlarmId);
+
+        Inventory cpnInventory = Objects.requireNonNull((Inventory) unmarshaller.unmarshal(Paths.get(cpnPath.toString(),
+                CPN_INVENTORY_FILE).toFile()));
+        Inventory onmsInventory =
+                Objects.requireNonNull((Inventory) unmarshaller.unmarshal(Paths.get(cpnPath.toString(),
+                        ONMS_INVENTORY_FILE).toFile()));
+
+        if (cpnInventory.getModelObjectEntry().isEmpty() || onmsInventory.getModelObjectEntry().isEmpty()) {
+            return;
+        }
+
+        Map<String, Map<String, String>> cpnInventoryIdToOnmsInventoryId = new HashMap<>();
+
+        for (ModelObjectEntry cpnInventoryObject : cpnInventory.getModelObjectEntry()) {
+            Optional<String> onmsMatchingId = Optional.empty();
+
+            switch (cpnInventoryObject.getType()) {
+                case "DEVICE":
+                    onmsMatchingId = mapDeviceId(cpnInventoryObject.getId(), nodeToNodeAndEvents);
+                    break;
+                case "PORT":
+                    onmsMatchingId = mapPortId(cpnInventoryObject.getId(), onmsEventIdToOnmsAlarmId,
+                            nodeToNodeAndEvents, onmsInventory);
+                    break;
+                case "BGP_PEER":
+                    onmsMatchingId = mapBgpPeerId(cpnInventoryObject.getId(), onmsEventIdToOnmsAlarmId,
+                            nodeToNodeAndEvents, onmsInventory);
+                    break;
+            }
+
+            onmsMatchingId.ifPresent(onmsId -> {
+                // Check that this inventory object is actually in the dataset
+                if (onmsInventory.getModelObjectEntry()
+                        .stream()
+                        .anyMatch(io -> io.getId().equals(onmsId))) {
+                    Map<String, String> cpnIdToOnmsId =
+                            cpnInventoryIdToOnmsInventoryId.computeIfAbsent(cpnInventoryObject.getType(),
+                                    key -> new HashMap<>());
+                    cpnIdToOnmsId.put(cpnInventoryObject.getId(), onmsId);
+                    cpnInventoryIdToOnmsInventoryId.put(cpnInventoryObject.getType(), cpnIdToOnmsId);
+                }
+            });
+        }
+
+        if (!cpnInventoryIdToOnmsInventoryId.isEmpty()) {
+            InventoryMap inventoryMap = new InventoryMap();
+
+            cpnInventoryIdToOnmsInventoryId.forEach((type, map) ->
+                    map.forEach((cpnId, onmsId) -> {
+                        InventoryMapping inventoryMapping = new InventoryMapping();
+                        inventoryMapping.setType(type);
+                        inventoryMapping.setCpnId(cpnId);
+                        inventoryMapping.setOnmsId(onmsId);
+                        inventoryMap.getInventoryMapping().add(inventoryMapping);
+                    })
+            );
+
+            marshaller.marshal(inventoryMap, Paths.get(outputPath.toString(), INVENTORY_MAP_FILE).toFile());
+        }
     }
 
     private ZonedDateTime findFirstAlarmTime(Alarms alarmSet1, Alarms alarmSet2) {
@@ -245,9 +383,10 @@ public class DSMapper {
     }
 
     private Map<String, String> mapAlarms(Alarms alarmsFromCpn, Alarms alarmsFromOnms,
-                                          Map<String, NodeAndEvents> nodeToNodeAndEvents) {
+                                          Map<String, NodeAndEvents> nodeToNodeAndEvents,
+                                          Map<String, String> onmsEventsToOnmsAlarms) {
         // Map all of the events in the onms alarms xml to their containing alarm
-        Map<String, String> onmsEventsToOnmsAlarms = mapEventsToAlarms(alarmsFromOnms);
+        Objects.requireNonNull(onmsEventsToOnmsAlarms).putAll(mapEventsToAlarms(alarmsFromOnms));
         // Retrieve all of the matching events
         // TODO: We may want to record this to XML as well
         Map<String, Integer> allMatchedEvents = getAllMatchedEvents(nodeToNodeAndEvents);
@@ -373,5 +512,154 @@ public class DSMapper {
         }
 
         return cpnSituationIdToOnmsSituationId;
+    }
+
+    private Optional<String> mapDeviceId(String inventoryId, Map<String, NodeAndEvents> nodeToNodeAndEvents) {
+        // The inventoryId is the cpn hostname
+
+        NodeAndEvents nodeAndEventsForHost = nodeToNodeAndEvents.get(inventoryId);
+
+        if (nodeAndEventsForHost != null) {
+            NodeAndFacts nodeAndFactsForHost = nodeAndEventsForHost.getNodeAndFacts();
+
+            if (nodeAndFactsForHost != null) {
+                return Optional.of(nodeAndFactsForHost.getOpennmsNodeId().toString());
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<String> mapPortId(String inventoryId, Map<String, String> onmsEventIdToOnmsAlarmId, Map<String,
+            NodeAndEvents> nodeToNodeAndEvents, Inventory onmsInventory) {
+        Pattern p = Pattern.compile("^(.*): (.*?) (.*)$");
+        Matcher m = p.matcher(inventoryId);
+        // Parse the CPN hostname
+        String cpnHostname = m.group(1);
+        // Parse the ifDescription
+        String ifDescr = m.group(3);
+
+        // Get the node and events for the hostname we parsed out if available
+        NodeAndEvents nodeAndEventsForHost = nodeToNodeAndEvents.get(cpnHostname);
+
+        if (nodeAndEventsForHost != null) {
+            Optional<Integer> eventIdForIo;
+
+            // Attempt to find an onms event related to this ifDescr via traps
+            eventIdForIo = nodeAndEventsForHost.getOnmsTrapEvents()
+                    .stream()
+                    .filter(trapEvent ->
+                            trapEvent.getP_oids()
+                                    .stream()
+                                    .anyMatch(oidsMap -> oidsMap.get("oid").equals(".1.3.6.1.2.1.31.1.1.1.1")
+                                            && oidsMap.get("value").equals(ifDescr))
+                    )
+                    .map(ESEventDTO::getId)
+                    .findAny();
+
+            if (!eventIdForIo.isPresent()) {
+                // We couldn't find via traps, now attempt to find an onms event related to this ifDescr via syslog
+                eventIdForIo = nodeAndEventsForHost.getOnmsSyslogEvents()
+                        .stream()
+                        .filter(syslogEvent ->
+                                Objects.equals(syslogEvent.getP_ifDescr(), ifDescr)
+                        )
+                        .map(ESEventDTO::getId)
+                        .findAny();
+            }
+
+            if (eventIdForIo.isPresent()) {
+                // We found an event either via traps or sylsog related to the ifDescr on this node
+                // Now attempt to find the alarm that this event is contained in
+                Optional<String> onmsAlarmId =
+                        Optional.ofNullable(onmsEventIdToOnmsAlarmId.get(eventIdForIo.get().toString()));
+
+                if (onmsAlarmId.isPresent()) {
+                    // Find the inventory object in the onms xml that has type port and the same alarm id
+                    // The id of this inventory object is what we will map to
+                    String alarmIdToFind = onmsAlarmId.get();
+
+                    return onmsInventory.getModelObjectEntry()
+                            .stream()
+                            .filter(mo -> {
+                                List<String> alarmIds = Arrays.asList(mo.getAlarmIds().split("\\s*,\\s*"));
+
+                                // Find an ONMS inventory object that has the same type "PORT" and contains the alarm we
+                                // found in its alarm ids
+                                return mo.getType().equals("PORT") && alarmIds.contains(alarmIdToFind);
+                            })
+                            // Note: Could sort this in descending order of event time and take the first one to make
+                            // this more predictable
+                            .map(ModelObjectEntry::getId)
+                            .findAny();
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<String> mapBgpPeerId(String inventoryId, Map<String, String> onmsEventIdToOnmsAlarmId, Map<String,
+            NodeAndEvents> nodeToNodeAndEvents, Inventory onmsInventory) {
+
+        Pattern p = Pattern.compile("^(.*): MpBgp (.*)$");
+        Matcher m = p.matcher(inventoryId);
+        String cpnHostname = m.group(1);
+        String bgpPeer = m.group(2);
+
+        NodeAndEvents nodeAndEvents = nodeToNodeAndEvents.get(cpnHostname);
+
+        if (nodeAndEvents != null) {
+            Optional<String> matchingEventId;
+
+            // Look in syslogs
+            matchingEventId = nodeAndEvents.getOnmsSyslogEvents()
+                    .stream()
+                    .filter(event -> Objects.equals(event.getP_bgpPeer(), bgpPeer))
+                    .map(event -> event.getId().toString())
+                    .findAny();
+
+            // Note: I couldn't find any examples of BGP peers we derived from a trap event so I'm omitting that for now
+
+            // If we found a matching event...
+            if (matchingEventId.isPresent()) {
+                // Find the alarm the event belongs to
+                String onmsAlarmId = onmsEventIdToOnmsAlarmId.get(matchingEventId.get());
+
+                if (onmsAlarmId != null) {
+                    // Find the onms inventory object that has type BGP_PEER and references that alarm...
+                    return onmsInventory.getModelObjectEntry()
+                            .stream()
+                            .filter(mo -> {
+                                List<String> alarmIds = Arrays.asList(mo.getAlarmIds().split("\\s*,\\s*"));
+                                return mo.getType().equals("BGP_PEER") && alarmIds.contains(onmsAlarmId);
+                            })
+                            // Note: Could sort this in descending order of event time and take the first one to make
+                            // this more predictable
+                            .map(ModelObjectEntry::getId)
+                            .findAny();
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private static class ProcessAlarmsResult {
+        private final Map<String, String> cpnAlarmIdToOnmsAlarmId;
+        private final Map<String, NodeAndEvents> nodeToNodeAndEvents;
+        private final Map<String, String> onmsEventIdToOnmsAlarmId;
+        private final Alarms cpnAlarms;
+        private final Alarms onmsAlarms;
+
+        ProcessAlarmsResult(Map<String, String> cpnAlarmIdToOnmsAlarmId,
+                            Map<String, NodeAndEvents> nodeToNodeAndEvents,
+                            Map<String, String> onmsEventIdToOnmsAlarmId, Alarms cpnAlarms, Alarms onmsAlarms) {
+            this.cpnAlarmIdToOnmsAlarmId = cpnAlarmIdToOnmsAlarmId;
+            this.nodeToNodeAndEvents = nodeToNodeAndEvents;
+            this.onmsEventIdToOnmsAlarmId = onmsEventIdToOnmsAlarmId;
+            this.cpnAlarms = cpnAlarms;
+            this.onmsAlarms = onmsAlarms;
+        }
     }
 }
