@@ -64,6 +64,9 @@ public class ESEventDTO {
     @SerializedName("alarmclearkey")
     private String alarmClearKey;
 
+    @SerializedName("eventseverity")
+    private Integer severity;
+
     @SerializedName("p_ifDescr")
     private String p_ifDescr;
 
@@ -169,6 +172,14 @@ public class ESEventDTO {
 
     public void setP_bgpPeer(String p_bgpPeer) {
         this.p_bgpPeer = p_bgpPeer;
+    }
+
+    public Integer getSeverity() {
+        return severity;
+    }
+
+    public void setSeverity(Integer severity) {
+        this.severity = severity;
     }
 
     @Override

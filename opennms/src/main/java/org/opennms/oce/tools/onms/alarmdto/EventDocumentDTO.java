@@ -28,8 +28,6 @@
 
 package org.opennms.oce.tools.onms.alarmdto;
 
-import java.util.Date;
-
 import com.google.gson.annotations.SerializedName;
 
 public class EventDocumentDTO {
@@ -45,15 +43,6 @@ public class EventDocumentDTO {
 
     @SerializedName("uei")
     private String uei;
-
-    @SerializedName("eventseverity")
-    private Integer severity;
-
-    @SerializedName("eventcreationtime")
-    private Date time;
-
-    @SerializedName("alarmreductionkey")
-    private String alarmReductionKey;
 
     public String getDescription() {
         return description;
@@ -87,37 +76,11 @@ public class EventDocumentDTO {
         this.uei = uei;
     }
 
-    public Integer getSeverity() {
-        return severity;
-    }
-
-    public void setSeverity(Integer severity) {
-        this.severity = severity;
-    }
-
-    public Date getTime() {
-        return time;
-    }
-
-    public void setTime(Date time) {
-        this.time = time;
-    }
-
-    public String getAlarmReductionKey() {
-        return alarmReductionKey;
-    }
-
-    public void setAlarmReductionKey(String alarmReductionKey) {
-        this.alarmReductionKey = alarmReductionKey;
-    }
-
     @Override
     public String toString() {
         return "EventDocumentDTO{" +
                 "description='" + description + '\'' +
                 ", id=" + id +
-                ", severity=" + severity +
-                ", time=" + time +
                 ", logMessage='" + logMessage + '\'' +
                 ", uei='" + uei + '\'' +
                 '}';
