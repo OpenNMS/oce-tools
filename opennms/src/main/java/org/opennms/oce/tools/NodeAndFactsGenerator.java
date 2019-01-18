@@ -447,7 +447,9 @@ public class NodeAndFactsGenerator {
 
                 // Build the alarm summary
                 final String logMessage = relatedAlarmDtos.iterator().next().getLogMessage();
-                final OnmsAlarmSummary alarmSummary = new OnmsAlarmSummary(relatedAlarmId, relatedReductionKey, alarmLifespan, logMessage, eventsInAlarm);
+                String moInstance = relatedAlarmDtos.iterator().next().getManagedObjectInstance();
+                String moType = relatedAlarmDtos.iterator().next().getManagedObjectType();
+                final OnmsAlarmSummary alarmSummary = new OnmsAlarmSummary(relatedAlarmId, relatedReductionKey, alarmLifespan, logMessage, moInstance, moType, eventsInAlarm);
                 alarmSummaries.add(alarmSummary);
             }
 

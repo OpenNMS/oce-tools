@@ -49,7 +49,7 @@ import org.opennms.oce.datasource.v1.schema.RelativeDefRef;
 import org.opennms.oce.datasource.v1.schema.RelativeRef;
 import org.opennms.oce.tools.cpn2oce.model.ModelObject;
 import org.opennms.oce.tools.cpn2oce.model.ModelObjectType;
-import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
+import org.opennms.oce.tools.tsaudit.OnmsAlarmSummary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,20 +60,20 @@ public class OnmsOceModelGenerator {
     public static final String MODEL_ROOT_TYPE = "Model";
     public static final String MODEL_ROOT_ID = "model";
 
-    private final List<AlarmDocumentDTO> alarms;
+    private final List<OnmsAlarmSummary> alarms;
 
     private MetaModel metaModel;
     private Inventory inventory;
 
-    public OnmsOceModelGenerator(List<AlarmDocumentDTO> alarms) {
+    public OnmsOceModelGenerator(List<OnmsAlarmSummary> alarms) {
         this.alarms = Objects.requireNonNull(alarms);
     }
 
-    public void generate() {
+    public void generate(Integer nodeId, String nodeLabel) {
         // Generate and flatten the tree of MOs
         final Set<ModelObject> allMos = new LinkedHashSet<>();
-        for (AlarmDocumentDTO alarm : alarms) {
-            final ModelObject mo = getModelObject(alarm);
+        for (OnmsAlarmSummary alarm : alarms) {
+            final ModelObject mo = getModelObject(alarm, nodeId.toString(), nodeLabel);
             if (mo != null) {
                 allMos.add(mo);
             }
@@ -215,7 +215,7 @@ public class OnmsOceModelGenerator {
         }
     }
 
-    public static ModelObject getModelObject(AlarmDocumentDTO alarm) {
+    public static ModelObject getModelObject(OnmsAlarmSummary alarm, String nodeId, String nodeLabel) {
         // Only derive inventory if the alarm has an MO type and instance
         if (Strings.isNullOrEmpty(alarm.getManagedObjectType()) || Strings.isNullOrEmpty(alarm.getManagedObjectInstance())) {
             return null;
@@ -230,7 +230,7 @@ public class OnmsOceModelGenerator {
             return null;
         }
 
-        ModelObject node = new ModelObject(alarm.getNode().getId().toString(), alarm.getNode().getLabel(), ModelObjectType.DEVICE);
+        ModelObject node = new ModelObject(nodeId, nodeLabel, ModelObjectType.DEVICE);
 
         switch (type) {
 
@@ -242,10 +242,10 @@ public class OnmsOceModelGenerator {
 
         case EntPhysicalEntity:
             // FIXME - hack
-            return new ModelObject(alarm.getNode().getId().toString(), alarm.getNode().getLabel(), ModelObjectType.FAN_TRAY, node);
+            return new ModelObject(nodeId, nodeLabel, ModelObjectType.FAN_TRAY, node);
 
         case BgpPeer:
-            return new ModelObject(alarm.getNode().getId().toString(), alarm.getNode().getLabel(), ModelObjectType.BGP_PEER);
+            return new ModelObject(nodeId, nodeLabel, ModelObjectType.BGP_PEER);
 
         default:
             return null;

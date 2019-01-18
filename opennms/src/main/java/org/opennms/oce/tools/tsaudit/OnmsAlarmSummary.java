@@ -37,15 +37,17 @@ public class OnmsAlarmSummary {
     private final String reductionKey;
     private final Lifespan lifespan;
     private final String logMessage;
+    private final String managedObjectInstance;
+    private final String managedObjectType;
     private final List<ESEventDTO> events;
     
-    // TODO: set the mo instance and type
-
-    public OnmsAlarmSummary(int id, String reductionKey, Lifespan lifespan, String logMessage, List<ESEventDTO> events) {
+    public OnmsAlarmSummary(int id, String reductionKey, Lifespan lifespan, String logMessage, String managedObjectInstance, String managedObjectType, List<ESEventDTO> events) {
         this.id = id;
         this.reductionKey = reductionKey;
         this.lifespan = lifespan;
         this.logMessage = logMessage;
+        this.managedObjectInstance = managedObjectInstance;
+        this.managedObjectType = managedObjectType;
         this.events = events;
     }
 
@@ -63,6 +65,14 @@ public class OnmsAlarmSummary {
 
     public String getLogMessage() {
         return logMessage;
+    }
+
+    public String getManagedObjectInstance() {
+        return managedObjectInstance;
+    }
+
+    public String getManagedObjectType() {
+        return managedObjectType;
     }
 
     public List<ESEventDTO> getEvents() {

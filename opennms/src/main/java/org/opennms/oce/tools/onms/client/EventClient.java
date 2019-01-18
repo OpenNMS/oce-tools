@@ -262,7 +262,7 @@ public class EventClient {
         return situations.stream().findFirst();
     }
 
-    public List<AlarmDocumentDTO> getAlarms(Set<Integer> alarmIds) throws IOException {
+    public void getAlarms(Set<Integer> alarmIds, Consumer<List<AlarmDocumentDTO>> callback) throws IOException {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.boolQuery()
                 .must(termsQuery("id", alarmIds)));
@@ -271,9 +271,19 @@ public class EventClient {
                 .setParameter(Parameters.SCROLL, "5m")
                 .build();
 
-        final List<AlarmDocumentDTO> alarms = new ArrayList<>();
-        scroll(search, AlarmDocumentDTO.class, alarms::addAll);
-        return alarms;
+        scroll(search, AlarmDocumentDTO.class, callback);
+    }
+
+    public void getEvents(List<Integer> eventIds, Consumer<List<ESEventDTO>> callback) throws IOException {
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(QueryBuilders.boolQuery()
+                .must(termsQuery("id", eventIds)));
+        final Search search = new Search.Builder(searchSourceBuilder.toString())
+                .addIndex(esClusterConfiguration.getOpennmsEventIndex())
+                .setParameter(Parameters.SCROLL, "5m")
+                .build();
+
+        scroll(search, ESEventDTO.class, callback);
     }
 
     public List<AlarmDocumentDTO> getAlarmsOnNodeId(long startMs, long endMs, int nodeId) throws IOException {

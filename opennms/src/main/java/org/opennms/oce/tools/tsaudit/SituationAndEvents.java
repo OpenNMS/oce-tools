@@ -79,4 +79,8 @@ public class SituationAndEvents {
     public String getLogMessage() {
         return firstSituationDto.getLogMessage();
     }
+
+    public Integer getSeverityId() {
+        return firstSituationDto.getSeverityId();
+    }
 }

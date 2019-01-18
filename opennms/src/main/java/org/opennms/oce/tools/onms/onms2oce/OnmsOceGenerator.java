@@ -29,12 +29,10 @@
 package org.opennms.oce.tools.onms.onms2oce;
 
 import java.io.File;
-import java.time.LocalDate;
-import java.time.ZoneId;
+import java.io.IOException;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -53,16 +51,14 @@ import org.opennms.oce.datasource.v1.schema.MetaModel;
 import org.opennms.oce.datasource.v1.schema.Severity;
 import org.opennms.oce.datasource.v1.schema.Situation;
 import org.opennms.oce.datasource.v1.schema.Situations;
-import org.opennms.oce.tools.cpn.model.EventRecord;
-import org.opennms.oce.tools.cpn2oce.EventMapper;
-import org.opennms.oce.tools.cpn2oce.model.EventDefinition;
-import org.opennms.oce.tools.es.ESClient;
-import org.opennms.oce.tools.es.ESClusterConfiguration;
-import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
-import org.opennms.oce.tools.onms.alarmdto.EventDocumentDTO;
-import org.opennms.oce.tools.onms.view.ESBackedOnmsDatasetViewer;
-import org.opennms.oce.tools.onms.view.OnmsDatasetView;
-import org.opennms.oce.tools.onms.view.OnmsDatasetViewer;
+import org.opennms.oce.tools.NodeAndFactsGenerator;
+import org.opennms.oce.tools.cpn.ESDataProvider;
+import org.opennms.oce.tools.onms.client.ESEventDTO;
+import org.opennms.oce.tools.onms.client.EventClient;
+import org.opennms.oce.tools.tsaudit.NodeAndEvents;
+import org.opennms.oce.tools.tsaudit.NodeAndFacts;
+import org.opennms.oce.tools.tsaudit.OnmsAlarmSummary;
+import org.opennms.oce.tools.tsaudit.SituationAndEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,142 +69,128 @@ public class OnmsOceGenerator  {
 
     private static final Logger LOG = LoggerFactory.getLogger(OnmsOceGenerator.class);
 
-    private final OnmsDatasetViewer viewer;
+    private final NodeAndFactsGenerator nodeAndFactsGenerator;
+
     private final boolean modelGenerationDisabled;
     private final File targetFolder;
-    private Integer situationId;
 
-    private Situations situations;
     private MetaModel metaModel;
     private Inventory inventory;
+    private Situations situations;
     private Alarms alarms;
 
+    private ZonedDateTime start;
+    private ZonedDateTime end;
+    private EventClient eventClient;
+    private ESDataProvider esDataProvider;
+
+    private OnmsOceGenerator(Builder builder) {
+        this.modelGenerationDisabled = builder.modelGenerationDisabled;
+        this.targetFolder = builder.targetFolder;
+        this.esDataProvider = builder.esDataProvider;
+        this.eventClient = builder.eventClient;
+        this.start = builder.start;
+        this.end = builder.end;
+
+        nodeAndFactsGenerator = NodeAndFactsGenerator.newBuilder()
+                .setEnd(this.end)
+                .setEsDataProvider(this.esDataProvider)
+                .setEventClient(this.eventClient)
+                .setHostnameSubstringsToFilter(Collections.emptyList())
+                .setStart(this.start)
+                .build();
+    }
 
     public static class Builder {
-        private OnmsDatasetViewer viewer;
         private boolean modelGenerationDisabled = false;
         private File targetFolder;
-        private Integer situationId;
-
-        public Builder withViewer(OnmsDatasetViewer viewer) {
-            this.viewer = viewer;
-            return this;
-        }
-
+        private ESDataProvider esDataProvider;
+        private EventClient eventClient;
+        private ZonedDateTime start;
+        private ZonedDateTime end;
         public Builder withModelGenerationDisabled(boolean modelGenerationDisabled) {
             this.modelGenerationDisabled = modelGenerationDisabled;
             return this;
         }
-
+        public Builder withDataProvider(ESDataProvider esDataProvider) {
+            this.esDataProvider = esDataProvider;
+            return this;
+        }
+        public Builder withClient(EventClient eventClient) {
+            this.eventClient = eventClient;
+            return this;
+        }
         public Builder withTargetFolder(File targetFolder) {
             this.targetFolder = targetFolder;
             return this;
         }
-
-        public Builder withSituationId(Integer situationId) {
-            this.situationId = situationId;
+        public Builder withStart(ZonedDateTime start) {
+            this.start = start;
             return this;
         }
-
+        public Builder withEnd(ZonedDateTime end) {
+            this.end = end;
+            return this;
+        }
         public OnmsOceGenerator build() {
-            Objects.requireNonNull(viewer, "viewer is required");
             return new OnmsOceGenerator(this);
         }
     }
 
-    private OnmsOceGenerator(Builder builder) {
-        this.viewer = builder.viewer;
-        this.modelGenerationDisabled = builder.modelGenerationDisabled;
-        this.targetFolder = builder.targetFolder;
-        this.situationId = builder.situationId;
+    public void run() throws IOException {
+        final List<NodeAndFacts> nodesAndFacts = nodeAndFactsGenerator.getNodesAndFacts();
+        if (nodesAndFacts.isEmpty()) {
+            System.out.println("No nodes found.");
+            return;
+        }
+
+        final List<NodeAndFacts> nodesToProcess = nodesAndFacts.stream()
+                .filter(NodeAndFacts::shouldProcess)
+                .collect(Collectors.toList());
+        
+        for (NodeAndFacts nodeAndFacts : nodesToProcess) {
+            final NodeAndEvents nodeAndEvents = nodeAndFactsGenerator.retrieveAndPairEvents(nodeAndFacts);
+            final List<SituationAndEvents> situationsAndEvents = nodeAndFactsGenerator.getSituationsAndPairEvents(nodeAndEvents);
+            generate(nodeAndFacts, situationsAndEvents);
+        }    
     }
 
-    private List<AlarmDocumentDTO> reduceSituations(List<AlarmDocumentDTO> situations) {
-            Map<Integer, AlarmDocumentDTO> filtered = new HashMap<>();
-            situations.forEach(s -> {
-                filtered.computeIfAbsent(s.getId(), k -> s);
-                AlarmDocumentDTO sit = filtered.get(s.getId());
-                // Add any missing alarm IDs
-                // update earliest and latest times
-                if (s.getFirstEventTime() < sit.getFirstEventTime()) {
-                    sit.setFirstEventTime(s.getFirstEventTime());
-                }
-                if (s.getLastEventTime() > sit.getLastEventTime()) {
-                    sit.setLastEventTime(s.getLastEventTime());
-                }
-                if (!sit.getRelatedAlarmIds().containsAll(s.getRelatedAlarmIds())) {
-                    s.getRelatedAlarms().stream().filter(a -> !sit.getRelatedAlarmIds().contains(a.getId())).forEach(sit::addRelatedAlarm);
-                }
-            });
-            return filtered.values().stream().collect(Collectors.toList());
-    }
+    private void generate(NodeAndFacts nodeAndFacts, List<SituationAndEvents> situationsAndEvents) {
+        Integer nodeId = nodeAndFacts.getOpennmsNodeId();
+        String nodeLabel = nodeAndFacts.getOpennmsNodeLabel();
 
-    public void generate() {
         LOG.info("Generating the situations..");
         situations = new Situations();
 
-        final List<EventDocumentDTO> allEvents = new LinkedList<>();
-        final List<AlarmDocumentDTO> allAlarms = new LinkedList<>();
+        final List<OnmsAlarmSummary> allAlarms = new LinkedList<>();
+        LOG.info("There are {} situations", situationsAndEvents.size());
 
-        List<AlarmDocumentDTO> filteredSituations = new LinkedList<>();
-        if (situationId == null) {
-            viewer.getSituationsForTimeRange(filteredSituations::addAll);
-            filteredSituations = reduceSituations(filteredSituations);
-
-            // Get all events and Alarms for the same period
-            viewer.getEventsForTimeRange(allEvents::addAll);
-            viewer.getAlarmsForTimeRange(allAlarms::addAll);
-
-        } else {
-            AlarmDocumentDTO situation = viewer.getSituationWithId(situationId);
-            if (situation == null) {
-                throw new IllegalStateException("No situation found with id: " + situationId);
-            }
-            filteredSituations.add(situation);
-            // FIXME - populate allEvents and allAlarms
-        }
-
-        LOG.info("THere are {} situations", filteredSituations.size());
-
-        int counter = 1;
-        for (AlarmDocumentDTO s : filteredSituations) {
+        for (SituationAndEvents s : situationsAndEvents) {
             final Situation situation = new Situation();
-            situation.setId(Integer.toString(s.getId()));
-            situation.setCreationTime(s.getFirstEventTime());
+            situation.setId(s.getId().toString());
+            situation.setCreationTime(s.getLifespan().getStartMs());
             situation.setSeverity(toSeverity(s.getSeverityId()));
-            situation.setSummary(s.getDescription());
-            situation.setDescription(s.getDescription());
+            situation.setSummary(s.getLogMessage());
+            situation.setDescription(s.getLogMessage());
 
-            final List<AlarmDocumentDTO> alarmsInSituation = new LinkedList<>();
-            // FIXME - use callback
-            // alarmsInSituation.addAll(viewer.getAlarmsInSituation(s, alarmsInSituation::addAll));
-            alarmsInSituation.addAll(allAlarms.stream().filter(a -> s.getRelatedAlarmIds().contains(a.getId())).collect(Collectors.toList()));
+            final List<OnmsAlarmSummary> alarmsInSituation = s.getAlarmSummaries();
+            allAlarms.addAll(alarmsInSituation);
 
-            LOG.info("Situation {} of {}", counter++, filteredSituations.size());
-            LOG.info("There are {} alarms in Situation {}", alarmsInSituation.size(), s.getId());
-            LOG.info("There are {} _distinct_ alarms in Situation {}", alarmsInSituation.stream().map(AlarmDocumentDTO::getId).distinct().collect(Collectors.toList()).size());
-
-            final List<EventDocumentDTO> eventsInSituation = new LinkedList<>();
-            // alarmsInSituation.stream().map(AlarmDocumentDTO::getLastEvent).forEach(eventsInSituation::add);
-            eventsInSituation.addAll(alarmsInSituation.stream().map(AlarmDocumentDTO::getLastEvent).collect(Collectors.toList()));
-
-            LOG.info("THere are {} events in Situation {}", eventsInSituation.size(), s.getId());
-            // LOG.info("THere are {} _distinct_ events in Situation {}", eventsInSituation.stream().map(EventDocumentDTO::getId).distinct().collect(Collectors.toList()).size());
+            final List<ESEventDTO> eventsInSituation = s.getEventsInSituation();
 
             if (eventsInSituation.size() < 1) {
                 LOG.info("No events for ticket: {}. Ignoring.", s);
                 continue;
             }
-            // allEvents.addAll(eventsInSituation);
-            // allAlarms.addAll(alarmsInSituation);
-            situation.getAlarmRef().addAll(getCausalityTree(s, alarmsInSituation, eventsInSituation));
+
+            situation.getAlarmRef().addAll(getCausalityTree(s, alarmsInSituation));
             situations.getSituation().add(situation);
         }
 
         if (!modelGenerationDisabled) {
             LOG.info("Generating inventory and meta-model...");
             final OnmsOceModelGenerator generator = new OnmsOceModelGenerator(allAlarms);
-            generator.generate();
+            generator.generate(nodeId, nodeLabel);
 
             metaModel = generator.getMetaModel();
             inventory = generator.getInventory();
@@ -220,46 +202,30 @@ public class OnmsOceGenerator  {
         LOG.info("Generating the list of alarms...");
         alarms = new Alarms();
 
-        // Index the events by alarm id
-        final Map<String, List<EventDocumentDTO>> eventsByUei = allEvents.stream().collect(Collectors.groupingBy(EventDocumentDTO::getAlarmReductionKey));
         // Process each alarm
-        eventsByUei.forEach((alarmId, events) -> {
-            // TODO - we need time in EventDocumentDTO
-            events.sort(Comparator.comparing(EventDocumentDTO::getTime));
-            
-            final EventDocumentDTO firstEvent = events.get(0);
-            final EventDocumentDTO lastEvent = events.get(events.size() - 1);
-             
+        allAlarms.forEach((a) -> {
             final Alarm alarm = new Alarm();
-            alarm.setId(alarmId);
-            alarm.setSummary(lastEvent.getDescription());
-            alarm.setDescription(lastEvent.getLogMessage());
-            alarm.setLastSeverity(toSeverity(lastEvent.getSeverity()));
-            alarm.setFirstEventTime(firstEvent.getTime().getTime());
-            alarm.setLastEventTime(lastEvent.getTime().getTime());
+            alarm.setId(Integer.toString(a.getId()));
+            alarm.setSummary(a.getLogMessage());
+            alarm.setDescription(a.getLogMessage());
+            // FIXME - SEVERITY - alarm.setLastSeverity(toSeverity(lastAlarm.get));
+            alarm.setFirstEventTime(a.getLifespan().getStartMs());
+            alarm.setLastEventTime(a.getLifespan().getEndMs());
             alarms.getAlarm().add(alarm);
 
-            for (EventDocumentDTO e : events) {
+            List<ESEventDTO> eventsInAlarms = a.getEvents();
+            eventsInAlarms.sort(Comparator.comparing(ESEventDTO::getTimestamp));
+
+            for (ESEventDTO e : eventsInAlarms) {
                 final Event event = new Event();
                 event.setId(e.getId().toString());
-                event.setSummary(e.getDescription());
+                // TODO - event.setSummary(e.getDescription());
+                // TODO - eventDocutmentDTO 'eventdescr'
                 event.setDescription(e.getLogMessage());
                 event.setSeverity(toSeverity(e.getSeverity()));
-                // FIXME event.setSource(e.getSource());
-                event.setTime(e.getTime().getTime());
+                // TODO event.setSource(e.getSource());
+                event.setTime(e.getTimestamp().getTime());
                 alarm.getEvent().add(event);
-
-/*
-                 FIXME
-                 if (alarm.getInventoryObjectType() == null && alarm.getInventoryObjectId() == null) {
-                    final EventDefinition matchingDef = getMachingEvenfDef(e);
-                    if (matchingDef == null) {
-                        throw new IllegalStateException("Should not happen!");
-                    }
-                    final ModelObject modelObject = matchingDef.getModelObjectTree(e);
-                    alarm.setInventoryObjectType(modelObject.getType().toString());
-                    alarm.setInventoryObjectId(modelObject.getId());
-                }*/
             }
         });
     }
@@ -288,31 +254,13 @@ public class OnmsOceGenerator  {
         LOG.info("Done.");
     }
 
-    public Situations getSituations() {
-        return situations;
-    }
-
-    public MetaModel getMetaModel() {
-        return metaModel;
-    }
-
-    public Inventory getInventory() {
-        return inventory;
-    }
-
-    public Alarms getAlarms() {
-        return alarms;
-    }
-
-    private static List<AlarmRef> getCausalityTree(AlarmDocumentDTO situation, List<AlarmDocumentDTO> alarmsInSituation, List<EventDocumentDTO> eventsInSituation) {
-        final Map<String, List<EventDocumentDTO>> eventsInTicketByAlarmId = eventsInSituation.stream().filter(Objects::nonNull).collect(Collectors.groupingBy(EventDocumentDTO::getUei));
-        return eventsInTicketByAlarmId.keySet().stream()
-                .map(alarmId -> {
-                    final AlarmRef cause = new AlarmRef();
-                    cause.setId(alarmId);
-                    return cause;
-                })
-                .collect(Collectors.toList());
+    private static List<AlarmRef> getCausalityTree(SituationAndEvents s, List<OnmsAlarmSummary> alarmsInSituation) {
+        final Map<Integer, List<OnmsAlarmSummary>> eventsInSituationByAlarmId = alarmsInSituation.stream().collect(Collectors.groupingBy(OnmsAlarmSummary::getId));
+        return eventsInSituationByAlarmId.keySet().stream().map(alarmId -> {
+            final AlarmRef cause = new AlarmRef();
+            cause.setId(alarmId.toString());
+            return cause;
+        }).collect(Collectors.toList());
     }
 
     private static Severity toSeverity(int severity) {
@@ -333,12 +281,4 @@ public class OnmsOceGenerator  {
         return Severity.INDETERMINATE;
     }
 
-    private static EventDefinition getMachingEvenfDef(EventRecord e) {
-        for (EventDefinition def : EventMapper.EVENT_DEFS) {
-            if (def.matches(e)) {
-                return def;
-            }
-        }
-        return null;
-    }
 }

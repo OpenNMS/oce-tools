@@ -33,7 +33,6 @@ import java.io.IOException;
 
 import org.kohsuke.args4j.Option;
 import org.opennms.oce.tools.onms.onms2oce.OnmsOceGenerator;
-import org.opennms.oce.tools.onms.view.ESBackedOnmsDatasetViewer;
 import org.opennms.oce.tools.onms.view.OnmsDatasetView;
 
 public class OnmsExportCommand extends AbstractCommand {
@@ -75,12 +74,10 @@ public class OnmsExportCommand extends AbstractCommand {
         }
 
         final OnmsOceGenerator oceGenerator = new OnmsOceGenerator.Builder()
-                .withViewer(new ESBackedOnmsDatasetViewer(context.getEsClient(), viewBuilder.build()))
-                .withSituationId(situationId)
                 .withTargetFolder(targetFolder)
                 .withModelGenerationDisabled(modelGenerationDisabled)
                 .build();
-        oceGenerator.generate();
+        oceGenerator.run();
         oceGenerator.writeResultsToDisk("opennms");
     }
 }

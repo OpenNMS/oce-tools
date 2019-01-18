@@ -472,7 +472,7 @@ public class TicketMatcher {
 
     private List<SituationAndEvents> getSituationsAndPairEvents(NodeAndEvents nodeAndEvents) throws IOException {
         // Retrieve the situations and alarms
-        final int nodeId = nodeAndEvents.getNodeAndFacts().getOpennmsNodeId();
+        final Integer nodeId = nodeAndEvents.getNodeAndFacts().getOpennmsNodeId();
         final List<AlarmDocumentDTO> allSituationDtos = eventClient.getSituationsOnNodeId(startMs, endMs, nodeId);
         final List<AlarmDocumentDTO> alarmDtos = eventClient.getAlarmsOnNodeId(startMs, endMs, nodeId);
 
@@ -532,7 +532,8 @@ public class TicketMatcher {
 
                 // Build the alarm summary
                 final String logMessage = relatedAlarmDtos.iterator().next().getLogMessage();
-                final OnmsAlarmSummary alarmSummary = new OnmsAlarmSummary(relatedAlarmId, relatedReductionKey, alarmLifespan, logMessage, eventsInAlarm);
+                String nodeLabel = nodeAndEvents.getNodeAndFacts().getOpennmsNodeLabel();
+                final OnmsAlarmSummary alarmSummary = new OnmsAlarmSummary(relatedAlarmId, relatedReductionKey, alarmLifespan, logMessage, nodeId.toString(), nodeLabel, eventsInAlarm);
                 alarmSummaries.add(alarmSummary);
             }
 
