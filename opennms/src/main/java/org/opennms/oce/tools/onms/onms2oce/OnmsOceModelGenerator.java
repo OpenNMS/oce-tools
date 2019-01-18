@@ -243,9 +243,9 @@ public class OnmsOceModelGenerator {
         case EntPhysicalEntity:
             // FIXME - hack
             return new ModelObject(alarm.getNode().getId().toString(), alarm.getNode().getLabel(), ModelObjectType.FAN_TRAY, node);
+
         case BgpPeer:
-            // FIXME - broken.
-            return new ModelObject(alarm.getNode().getId().toString(), alarm.getNode().getLabel(), ModelObjectType.DEVICE);
+            return new ModelObject(alarm.getNode().getId().toString(), alarm.getNode().getLabel(), ModelObjectType.BGP_PEER);
 
         default:
             return null;
