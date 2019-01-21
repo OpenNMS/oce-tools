@@ -31,7 +31,6 @@ package org.opennms.oce.tools.main;
 import java.io.File;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
@@ -62,6 +61,7 @@ public class OceTools {
             GenerateKemConfigCommand.NAME,
             CpnReportCommand.NAME,
             CpnOnmsSyslogAudit.NAME,
+            OnmsExportCommand.NAME,
             TSAuditCommand.NAME,
             DSMapCommand.NAME
     );
@@ -83,6 +83,7 @@ public class OceTools {
             @SubCommand(name=GenerateKemConfigCommand.NAME, impl=GenerateKemConfigCommand.class),
             @SubCommand(name=CpnReportCommand.NAME, impl=CpnReportCommand.class),
             @SubCommand(name=CpnOnmsSyslogAudit.NAME, impl=CpnOnmsSyslogAudit.class),
+            @SubCommand(name=OnmsExportCommand.NAME, impl=OnmsExportCommand.class),
             @SubCommand(name=TSAuditCommand.NAME, impl=TSAuditCommand.class),
             @SubCommand(name=DSMapCommand.NAME, impl=DSMapCommand.class)
     })

@@ -32,12 +32,14 @@ import java.io.File;
 import java.io.IOException;
 
 import org.kohsuke.args4j.Option;
+import org.opennms.oce.tools.cpn.ESDataProvider;
+import org.opennms.oce.tools.es.ESClient;
+import org.opennms.oce.tools.onms.client.EventClient;
 import org.opennms.oce.tools.onms.onms2oce.OnmsOceGenerator;
-import org.opennms.oce.tools.onms.view.OnmsDatasetView;
 
 public class OnmsExportCommand extends AbstractCommand {
 
-    public static final String NAME = "cpn-oce-export";
+    public static final String NAME = "onms-oce-export";
 
     @Option(name="--from",aliases = {"-f"}, usage="From date i.e. Oct 28 2018")
     private String from;
@@ -60,21 +62,22 @@ public class OnmsExportCommand extends AbstractCommand {
 
     @Override
     public void doExec(Context context) throws Exception {
-        final OnmsDatasetView.Builder viewBuilder = new OnmsDatasetView.Builder();
-        if (from != null) {
-            viewBuilder.withStartTime(CommandUtils.parseDate(from));
-        }
-        if (to != null) {
-            viewBuilder.withEndTime(CommandUtils.parseDate(to));
-        }
-
         // Ensure the target directory exists
         if (!targetFolder.isDirectory() && !targetFolder.mkdirs()) {
             throw new IOException("Failed to create the target directory: " + targetFolder);
         }
 
+        ESClient esClient = context.getEsClient();
+        ESDataProvider esDataProvider = new ESDataProvider(esClient);
+
+        EventClient eventClient = new EventClient(esClient);
+
         final OnmsOceGenerator oceGenerator = new OnmsOceGenerator.Builder()
                 .withTargetFolder(targetFolder)
+                .withStart(CommandUtils.parseDate(from))
+                .withEnd(CommandUtils.parseDate(to))
+                .withClient(eventClient)
+                .withDataProvider(esDataProvider)
                 .withModelGenerationDisabled(modelGenerationDisabled)
                 .build();
         oceGenerator.run();

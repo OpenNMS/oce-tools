@@ -254,9 +254,13 @@ public class NodeAndFactsGenerator {
                 Date messageTime;
 
                 // Parse the syslog record and extract the date from the message
-                GenericSyslogMessage parsedSyslogMessage = GenericSyslogMessage.fromCpn(syslog.getEventId(),
-                        nodeAndFacts.getCpnHostname(), syslog.getDetailedDescription());
-                messageTime = parsedSyslogMessage.getDate();
+                try {
+                    GenericSyslogMessage parsedSyslogMessage = GenericSyslogMessage.fromCpn(syslog.getEventId(), nodeAndFacts.getCpnHostname(), syslog.getDetailedDescription());
+                    messageTime = parsedSyslogMessage.getDate();
+                } catch (NullPointerException npe) {
+                    // skip
+                    continue;
+                }
 
                 // Compute the delta between the message date, and the time at which the event was processed
                 deltas.add(Math.abs(processedTime.getTime() - messageTime.getTime()));
