@@ -33,13 +33,11 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -48,39 +46,45 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 
 import org.junit.Before;
-import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
+import org.junit.rules.TemporaryFolder;
 import org.mockito.Matchers;
+import org.opennms.oce.datasource.v1.schema.AToBInventoryMapping;
+import org.opennms.oce.datasource.v1.schema.AToBMapping;
 import org.opennms.oce.datasource.v1.schema.Alarm;
 import org.opennms.oce.datasource.v1.schema.AlarmMap;
-import org.opennms.oce.datasource.v1.schema.AlarmMapping;
 import org.opennms.oce.datasource.v1.schema.AlarmRef;
 import org.opennms.oce.datasource.v1.schema.Alarms;
+import org.opennms.oce.datasource.v1.schema.DataSetMap;
 import org.opennms.oce.datasource.v1.schema.Event;
 import org.opennms.oce.datasource.v1.schema.EventMap;
-import org.opennms.oce.datasource.v1.schema.EventMapping;
+import org.opennms.oce.datasource.v1.schema.Inventory;
+import org.opennms.oce.datasource.v1.schema.InventoryMap;
+import org.opennms.oce.datasource.v1.schema.ModelObjectEntry;
 import org.opennms.oce.datasource.v1.schema.Situation;
 import org.opennms.oce.datasource.v1.schema.SituationMap;
-import org.opennms.oce.datasource.v1.schema.SituationMapping;
 import org.opennms.oce.datasource.v1.schema.Situations;
 import org.opennms.oce.tools.NodeAndFactsGenerator;
 import org.opennms.oce.tools.cpn.ESDataProvider;
+import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
 import org.opennms.oce.tools.tsaudit.NodeAndEvents;
 import org.opennms.oce.tools.tsaudit.NodeAndFacts;
+import org.opennms.oce.tools.tsaudit.OnmsAlarmSummary;
+import org.opennms.oce.tools.tsaudit.SituationAndEvents;
 
 public class DSMApperTest {
     private final NodeAndFactsGenerator mockNAF = mock(NodeAndFactsGenerator.class);
     private final NodeAndFactsGenerator.NodeAndFactsGeneratorBuilder mockNAFBuilder =
             mock(NodeAndFactsGenerator.NodeAndFactsGeneratorBuilder.class);
     private final Unmarshaller mockUnMarshaller = mock(Unmarshaller.class);
-    private final Marshaller mockMarshaller = mock(Marshaller.class);
     private DSMapper dsMapper;
 
     private final Map<String, Integer> matchingEvents = new HashMap<String, Integer>() {{
@@ -130,6 +134,9 @@ public class DSMApperTest {
     private static final String mockPathOut = "/tmp/out";
     private static final String mockHost = "mockhost";
 
+    @Rule
+    public TemporaryFolder tmpFolder = new TemporaryFolder();
+
     @Before
     public void setup() throws JAXBException, IOException {
         when(mockNAFBuilder.setCpnEventExcludes(any())).thenReturn(mockNAFBuilder);
@@ -152,63 +159,126 @@ public class DSMApperTest {
                 .thenReturn(getMockCpnSituations());
         when(mockUnMarshaller.unmarshal(Paths.get(mockPathOnms, DSMapper.ONMS_SITUATIONS_FILE).toFile()))
                 .thenReturn(getMockOnmsSituations());
+        when(mockUnMarshaller.unmarshal(Paths.get(mockPathCpn, DSMapper.CPN_INVENTORY_FILE).toFile()))
+                .thenReturn(getMockCpnInventory());
+        when(mockUnMarshaller.unmarshal(Paths.get(mockPathOnms, DSMapper.ONMS_INVENTORY_FILE).toFile()))
+                .thenReturn(getMockOnmsInventory());
         dsMapper = new DSMapper(mock(ESDataProvider.class), mock(EventClient.class), Paths.get(mockPathCpn),
                 Paths.get(mockPathOnms), Paths.get(mockPathOut), () -> mockNAFBuilder);
     }
 
     @Test
-    public void canMapAlarms() throws IOException, JAXBException {
-        ArgumentCaptor<AlarmMap> captor = ArgumentCaptor.forClass(AlarmMap.class);
-        dsMapper.processAlarms(mockUnMarshaller, mockMarshaller);
-        verify(mockMarshaller, times(1)).marshal(captor.capture(), Matchers.any(File.class));
-        AlarmMap alarmMap = captor.getValue();
-        AlarmMapping expectedMapping = new AlarmMapping();
-        expectedMapping.setCpnAlarmId("1");
-        expectedMapping.setOnmsAlarmId("2");
-        assertThat(alarmMap.getAlarmMapping().contains(expectedMapping), equalTo(true));
-        assertThat(alarmMap.getAlarmMapping(), hasSize(1));
+    public void canMarshalOutput() throws JAXBException {
+        AlarmMap alarmMap = new AlarmMap();
+        AToBMapping aToBMapping = new AToBMapping();
+        aToBMapping.setAId("aId");
+        aToBMapping.setBId("bId");
+        alarmMap.getAToBMapping().add(aToBMapping);
+
+        EventMap eventMap = new EventMap();
+        eventMap.getAToBMapping().add(aToBMapping);
+
+        SituationMap situationMap = new SituationMap();
+        situationMap.getAToBMapping().add(aToBMapping);
+
+        InventoryMap inventoryMap = new InventoryMap();
+        AToBInventoryMapping aToBInventoryMapping = new AToBInventoryMapping();
+        aToBInventoryMapping.setAType("DEVICE");
+        aToBInventoryMapping.setAId("aId");
+        aToBInventoryMapping.setBType("DEVICE");
+        aToBInventoryMapping.setBId("bId");
+        inventoryMap.getAToBInventoryMapping().add(aToBInventoryMapping);
+
+        DataSetMap dataSetMap = new DataSetMap();
+        String aPath = "/test/from/cpn";
+        String bPath = "/test/from/onms";
+        dataSetMap.setDataSetA(aPath);
+        dataSetMap.setDataSetB(bPath);
+        dataSetMap.setAlarmMap(alarmMap);
+        dataSetMap.setEventMap(eventMap);
+        dataSetMap.setSituationMap(situationMap);
+        dataSetMap.setInventoryMap(inventoryMap);
+
+        // Marshal the XML file out
+        String outputFileName = "output.xml";
+        JAXBContext jaxbMarshalContext = JAXBContext.newInstance(DataSetMap.class);
+        Marshaller marshaller = jaxbMarshalContext.createMarshaller();
+        marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+        marshaller.marshal(dataSetMap, Paths.get(Paths.get(tmpFolder.getRoot().getAbsolutePath()).toString(),
+                outputFileName).toFile());
+
+        Unmarshaller unmarshaller = jaxbMarshalContext.createUnmarshaller();
+        DataSetMap unmarshalledDataSetMap =
+                (DataSetMap) unmarshaller.unmarshal(Paths.get(Paths.get(tmpFolder.getRoot()
+                        .getAbsolutePath()).toString(), outputFileName).toFile());
+        assertThat(unmarshalledDataSetMap.getDataSetA(), equalTo(aPath));
+        assertThat(unmarshalledDataSetMap.getDataSetB(), equalTo(bPath));
+        assertThat(unmarshalledDataSetMap.getAlarmMap().getAToBMapping().iterator().next(), equalTo(aToBMapping));
+        assertThat(unmarshalledDataSetMap.getEventMap().getAToBMapping().iterator().next(), equalTo(aToBMapping));
+        assertThat(unmarshalledDataSetMap.getSituationMap().getAToBMapping().iterator().next(), equalTo(aToBMapping));
+        assertThat(unmarshalledDataSetMap.getInventoryMap().getAToBInventoryMapping().iterator().next(),
+                equalTo(aToBInventoryMapping));
+
     }
 
     @Test
-    public void canMapEvents() throws JAXBException {
-        NodeAndEvents mockNodeAndEvents = mock(NodeAndEvents.class);
-        when(mockNodeAndEvents.getMatchedEvents()).thenReturn(matchingEvents);
-        Map<String, NodeAndEvents> mockNodeToNodeAndEvents = new HashMap<>();
-        mockNodeToNodeAndEvents.put(mockHost, mockNodeAndEvents);
+    public void canMapAlarms() throws IOException, JAXBException {
+        AlarmMap alarmMap = dsMapper.processAlarms(mockUnMarshaller).alarmMap;
 
-        dsMapper.processEvents(mockNodeToNodeAndEvents, mockMarshaller, getMockCpnAlarms(), getMockOnmsAlarms());
-        ArgumentCaptor<EventMap> captor = ArgumentCaptor.forClass(EventMap.class);
-        verify(mockMarshaller, times(1)).marshal(captor.capture(), Matchers.any(File.class));
-        EventMap eventMap = captor.getValue();
-        EventMapping expectedEventMapping = new EventMapping();
-        expectedEventMapping.setCpnEventId("1");
-        expectedEventMapping.setOnmsEventId("2");
-        EventMapping unexpectedEventMapping = new EventMapping();
-        unexpectedEventMapping.setCpnEventId("9");
-        unexpectedEventMapping.setOnmsEventId("10");
-        assertThat(eventMap.getEventMapping(), hasSize(7));
-        assertThat(eventMap.getEventMapping().contains(expectedEventMapping), equalTo(true));
-        assertThat(eventMap.getEventMapping().contains(unexpectedEventMapping), equalTo(false));
+        AToBMapping expectedMapping = new AToBMapping();
+        expectedMapping.setAId("1");
+        expectedMapping.setBId("2");
+        assertThat(alarmMap.getAToBMapping().contains(expectedMapping), equalTo(true));
+        assertThat(alarmMap.getAToBMapping(), hasSize(1));
+    }
+
+    @Test
+    public void canMapEvents() {
+        EventMap eventMap = dsMapper.processEvents(getMockNodeToNodeAndEvents(), getMockCpnAlarms(),
+                getMockOnmsAlarms());
+
+        AToBMapping expectedEventMapping = new AToBMapping();
+        expectedEventMapping.setAId("1");
+        expectedEventMapping.setBId("2");
+        AToBMapping unexpectedEventMapping = new AToBMapping();
+        unexpectedEventMapping.setAId("9");
+        unexpectedEventMapping.setAId("10");
+        assertThat(eventMap.getAToBMapping(), hasSize(7));
+        assertThat(eventMap.getAToBMapping().contains(expectedEventMapping), equalTo(true));
+        assertThat(eventMap.getAToBMapping().contains(unexpectedEventMapping), equalTo(false));
     }
 
     @Test
     public void canMapSituations() throws JAXBException {
-        ArgumentCaptor<SituationMap> captor = ArgumentCaptor.forClass(SituationMap.class);
-        dsMapper.processSituations(mockUnMarshaller, alarmIdMap, mockMarshaller);
-        verify(mockMarshaller, times(1)).marshal(captor.capture(), Matchers.any(File.class));
-        SituationMap situationMap = captor.getValue();
-        SituationMapping expectedMapping = new SituationMapping();
-        expectedMapping.setCpnTicketId("1");
-        expectedMapping.setOnmsSituationId("2");
-        assertThat(situationMap.getSituationMapping().contains(expectedMapping), equalTo(true));
-        assertThat(situationMap.getSituationMapping(), hasSize(1));
+        SituationMap situationMap = dsMapper.processSituations(alarmIdMap, mockUnMarshaller);
+        AToBMapping expectedMapping = new AToBMapping();
+        expectedMapping.setAId("1");
+        expectedMapping.setBId("2");
+        assertThat(situationMap.getAToBMapping().contains(expectedMapping), equalTo(true));
+        assertThat(situationMap.getAToBMapping(), hasSize(1));
     }
 
     @Test
-    @Ignore
     public void canMapInventory() throws JAXBException {
-        // TODO
-        dsMapper.processInventory(null, null, null, null);
+        InventoryMap inventoryMap = dsMapper.processInventory(getMockNodeToNodeAndEvents(),
+                getMockNodeToSituationAndEvents(), getMockOnmsEventIdToOnmsAlarmId(), mockUnMarshaller);
+        AToBInventoryMapping expectedHostMapping = new AToBInventoryMapping();
+
+        // Test mapping a device
+        expectedHostMapping.setAId(mockHost);
+        expectedHostMapping.setAType("DEVICE");
+        expectedHostMapping.setBId("1001");
+        expectedHostMapping.setBType("DEVICE");
+        assertThat(inventoryMap.getAToBInventoryMapping().contains(expectedHostMapping), equalTo(true));
+
+        // Test mapping a port using the info from a trap
+        expectedHostMapping.setAId(mockHost + ": GigabitEthernet0/0/1");
+        expectedHostMapping.setAType("PORT");
+        expectedHostMapping.setBId("1001:1");
+        expectedHostMapping.setBType("PORT");
+        assertThat(inventoryMap.getAToBInventoryMapping().contains(expectedHostMapping), equalTo(true));
+
+        // TODO: test mapping a port using the info from syslog
     }
 
     private Alarms getMockCpnAlarms() {
@@ -304,5 +374,85 @@ public class DSMApperTest {
         });
 
         return onmsSituations;
+    }
+
+    private Map<String, String> getMockOnmsEventIdToOnmsAlarmId() {
+        Map<String, String> onmsEventIdToOnmsAlarmId = new HashMap<>();
+
+        onmsAlarmEvents.forEach((alarmId, events) ->
+                events.forEach(eventId -> onmsEventIdToOnmsAlarmId.put(eventId, alarmId))
+        );
+
+        return onmsEventIdToOnmsAlarmId;
+    }
+
+    private Map<String, NodeAndEvents> getMockNodeToNodeAndEvents() {
+        NodeAndEvents mockNodeAndEvents = mock(NodeAndEvents.class);
+        when(mockNodeAndEvents.getMatchedEvents()).thenReturn(matchingEvents);
+        List<ESEventDTO> onmsTraps = new ArrayList<>();
+        ESEventDTO onmsTrap = new ESEventDTO();
+        onmsTrap.setNodeId(1001);
+        List<Map<String, String>> p_oids = new ArrayList<>();
+        Map<String, String> poid1 = new HashMap<>();
+        poid1.put("oid", ".1.3.6.1.2.1.31.1.1.1.1.1");
+        poid1.put("value", "GigabitEthernet0/0/1");
+        p_oids.add(poid1);
+        onmsTrap.setP_oids(p_oids);
+        onmsTraps.add(onmsTrap);
+        when(mockNodeAndEvents.getOnmsTrapEvents()).thenReturn(onmsTraps);
+        NodeAndFacts mockNodeAndFacts = mock(NodeAndFacts.class);
+        when(mockNodeAndFacts.getOpennmsNodeId()).thenReturn(1001);
+        when(mockNodeAndEvents.getNodeAndFacts()).thenReturn(mockNodeAndFacts);
+        Map<String, NodeAndEvents> mockNodeToNodeAndEvents = new HashMap<>();
+        mockNodeToNodeAndEvents.put(mockHost, mockNodeAndEvents);
+
+        return mockNodeToNodeAndEvents;
+    }
+
+    private Map<String, List<SituationAndEvents>> getMockNodeToSituationAndEvents() {
+        SituationAndEvents mockSituationAndEvents = mock(SituationAndEvents.class);
+        List<OnmsAlarmSummary> alarmSummaries = new ArrayList<>();
+        // TODO: populate alarm summaries
+        when(mockSituationAndEvents.getAlarmSummaries()).thenReturn(alarmSummaries);
+        Map<String, List<SituationAndEvents>> mockNodeToSituationAndEvents = new HashMap<>();
+        mockNodeToSituationAndEvents.put(mockHost, Collections.singletonList(mockSituationAndEvents));
+
+        return mockNodeToSituationAndEvents;
+    }
+
+    private Inventory getMockCpnInventory() {
+        Inventory cpnInventory = new Inventory();
+        ModelObjectEntry modelObjectEntry = new ModelObjectEntry();
+        modelObjectEntry.setParentId("model");
+        modelObjectEntry.setParentType("Model");
+        modelObjectEntry.setType("DEVICE");
+        modelObjectEntry.setId(mockHost);
+        cpnInventory.getModelObjectEntry().add(modelObjectEntry);
+
+        ModelObjectEntry modelObjectEntryPort = new ModelObjectEntry();
+        modelObjectEntryPort.setParentId(mockHost);
+        modelObjectEntryPort.setParentType("DEVICE");
+        modelObjectEntryPort.setType("PORT");
+        modelObjectEntryPort.setId(mockHost + ": GigabitEthernet0/0/1");
+        cpnInventory.getModelObjectEntry().add(modelObjectEntryPort);
+        return cpnInventory;
+    }
+
+    private Inventory getMockOnmsInventory() {
+        Inventory onmsInventory = new Inventory();
+        ModelObjectEntry modelObjectEntry = new ModelObjectEntry();
+        modelObjectEntry.setParentId("model");
+        modelObjectEntry.setParentType("Model");
+        modelObjectEntry.setType("DEVICE");
+        modelObjectEntry.setId(Integer.toString(1001));
+        onmsInventory.getModelObjectEntry().add(modelObjectEntry);
+
+        ModelObjectEntry modelObjectEntryPort = new ModelObjectEntry();
+        modelObjectEntryPort.setParentId("1001");
+        modelObjectEntryPort.setParentType("DEVICE");
+        modelObjectEntryPort.setType("PORT");
+        modelObjectEntryPort.setId("1001:1");
+        onmsInventory.getModelObjectEntry().add(modelObjectEntryPort);
+        return onmsInventory;
     }
 }

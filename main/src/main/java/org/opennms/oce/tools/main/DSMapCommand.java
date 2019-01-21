@@ -28,10 +28,7 @@
 
 package org.opennms.oce.tools.main;
 
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.LinkedList;
-import java.util.List;
 
 import org.kohsuke.args4j.Option;
 import org.opennms.oce.tools.NodeAndFactsGenerator;
@@ -39,7 +36,6 @@ import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.dsmapping.DSMapper;
 import org.opennms.oce.tools.es.ESClient;
 import org.opennms.oce.tools.onms.client.EventClient;
-import org.opennms.oce.tools.tsaudit.TSAudit;
 
 public class DSMapCommand extends AbstractCommand {
     public static final String NAME = "dsmap";
@@ -53,6 +49,14 @@ public class DSMapCommand extends AbstractCommand {
     @Option(name = "--output-dir", aliases = {"-o"}, usage = "TODO")
     private String outputDir;
 
+    // TODO: Temporary
+    @Option(name = "--from", aliases = {"-f"}, usage = "From date i.e. Oct 28 2018")
+    private String from;
+
+    // TODO: Temporary
+    @Option(name = "--to", aliases = {"-t"}, usage = "To date i.e. Oct 29 2018")
+    private String to;
+
     public DSMapCommand() {
         super(NAME);
     }
@@ -64,6 +68,11 @@ public class DSMapCommand extends AbstractCommand {
         EventClient eventClient = new EventClient(esClient);
         DSMapper dsMapper = new DSMapper(esDataProvider, eventClient, Paths.get(cpnDir), Paths.get(onmsDir),
                 Paths.get(outputDir), NodeAndFactsGenerator::newBuilder);
+        
+        // TODO: Temporary hack to explicitly set the date range rather than derive from xml
+        CommandUtils.DateRange range = CommandUtils.parseDateRange(from, to);
+        dsMapper.overrideStart(range.getStart());
+        dsMapper.overrideEnd(range.getEnd());
         dsMapper.run();
     }
 }
