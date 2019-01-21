@@ -246,7 +246,7 @@ public class OnmsOceModelGenerator {
         switch (type) {
 
         case SnmpInterface:
-            return new ModelObject(alarm.getManagedObjectInstance(), alarm.getManagedObjectInstance(), ModelObjectType.PORT, node);
+            return new ModelObject(nodeId + ":" + alarm.getManagedObjectInstance(), alarm.getManagedObjectInstance(), ModelObjectType.PORT, node);
 
         case Node:
             return node;
