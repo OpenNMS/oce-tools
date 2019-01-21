@@ -49,6 +49,8 @@ import org.opennms.oce.datasource.v1.schema.RelativeDefRef;
 import org.opennms.oce.datasource.v1.schema.RelativeRef;
 import org.opennms.oce.tools.cpn2oce.model.ModelObject;
 import org.opennms.oce.tools.cpn2oce.model.ModelObjectType;
+import org.opennms.oce.tools.onms.alarmdto.EventDocumentDTO;
+import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.tsaudit.OnmsAlarmSummary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,11 +71,11 @@ public class OnmsOceModelGenerator {
         this.alarms = Objects.requireNonNull(alarms);
     }
 
-    public void generate(Integer nodeId, String nodeLabel) {
+    public void generate() {
         // Generate and flatten the tree of MOs
         final Set<ModelObject> allMos = new LinkedHashSet<>();
         for (OnmsAlarmSummary alarm : alarms) {
-            final ModelObject mo = getModelObject(alarm, nodeId.toString(), nodeLabel);
+            final ModelObject mo = getModelObject(alarm);
             if (mo != null) {
                 allMos.add(mo);
             }
@@ -215,9 +217,10 @@ public class OnmsOceModelGenerator {
         }
     }
 
-    public static ModelObject getModelObject(OnmsAlarmSummary alarm, String nodeId, String nodeLabel) {
-        // Only derive inventory if the alarm has an MO type and instance
-        if (Strings.isNullOrEmpty(alarm.getManagedObjectType()) || Strings.isNullOrEmpty(alarm.getManagedObjectInstance())) {
+    public static ModelObject getModelObject(OnmsAlarmSummary alarm) {
+        // Only derive inventory if the alarm has an MO type and instance and at least one event
+        if (Strings.isNullOrEmpty(alarm.getManagedObjectType()) || Strings.isNullOrEmpty(alarm.getManagedObjectInstance()) || alarm.getEvents() == null
+                || alarm.getEvents().isEmpty()) {
             return null;
         }
 
@@ -230,6 +233,14 @@ public class OnmsOceModelGenerator {
             return null;
         }
 
+        ESEventDTO firstEvent = alarm.getEvents().get(0);
+        if (firstEvent == null || firstEvent.getNodeId() == null) {
+            // data error
+            return null;
+        }
+        String nodeId = firstEvent.getNodeId().toString();
+        String nodeLabel = firstEvent.getNodeLabel();
+
         ModelObject node = new ModelObject(nodeId, nodeLabel, ModelObjectType.DEVICE);
 
         switch (type) {
@@ -241,7 +252,7 @@ public class OnmsOceModelGenerator {
             return node;
 
         case EntPhysicalEntity:
-            // FIXME - hack
+            // TODO - hack
             return new ModelObject(nodeId, nodeLabel, ModelObjectType.FAN_TRAY, node);
 
         case BgpPeer:

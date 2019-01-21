@@ -30,7 +30,10 @@ package org.opennms.oce.tools.onms.onms2oce;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
@@ -53,6 +56,8 @@ import org.opennms.oce.datasource.v1.schema.Situation;
 import org.opennms.oce.datasource.v1.schema.Situations;
 import org.opennms.oce.tools.NodeAndFactsGenerator;
 import org.opennms.oce.tools.cpn.ESDataProvider;
+import org.opennms.oce.tools.es.ESClient;
+import org.opennms.oce.tools.es.ESClusterConfiguration;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
 import org.opennms.oce.tools.tsaudit.NodeAndEvents;
@@ -61,6 +66,8 @@ import org.opennms.oce.tools.tsaudit.OnmsAlarmSummary;
 import org.opennms.oce.tools.tsaudit.SituationAndEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Strings;
 
 /**
  * Used to generate data that can be consumed by OCE.
@@ -71,6 +78,7 @@ public class OnmsOceGenerator  {
 
     private final NodeAndFactsGenerator nodeAndFactsGenerator;
 
+    private final List<OnmsAlarmSummary> allAlarms = new LinkedList<>();
     private final boolean modelGenerationDisabled;
     private final File targetFolder;
 
@@ -144,25 +152,25 @@ public class OnmsOceGenerator  {
             return;
         }
 
+        situations = new Situations();
+        alarms = new Alarms();
+
         final List<NodeAndFacts> nodesToProcess = nodesAndFacts.stream()
                 .filter(NodeAndFacts::shouldProcess)
                 .collect(Collectors.toList());
         
+        // Itterate over nodeAndFacts to generate and accumulate the data
         for (NodeAndFacts nodeAndFacts : nodesToProcess) {
             final NodeAndEvents nodeAndEvents = nodeAndFactsGenerator.retrieveAndPairEvents(nodeAndFacts);
             final List<SituationAndEvents> situationsAndEvents = nodeAndFactsGenerator.getSituationsAndPairEvents(nodeAndEvents);
             generate(nodeAndFacts, situationsAndEvents);
         }    
+        // after data has been accumulated
+        processAlarmsAndDeriveInventory();
     }
 
     private void generate(NodeAndFacts nodeAndFacts, List<SituationAndEvents> situationsAndEvents) {
-        Integer nodeId = nodeAndFacts.getOpennmsNodeId();
-        String nodeLabel = nodeAndFacts.getOpennmsNodeLabel();
-
         LOG.info("Generating the situations..");
-        situations = new Situations();
-
-        final List<OnmsAlarmSummary> allAlarms = new LinkedList<>();
         LOG.info("There are {} situations", situationsAndEvents.size());
 
         for (SituationAndEvents s : situationsAndEvents) {
@@ -179,18 +187,20 @@ public class OnmsOceGenerator  {
             final List<ESEventDTO> eventsInSituation = s.getEventsInSituation();
 
             if (eventsInSituation.size() < 1) {
-                LOG.info("No events for ticket: {}. Ignoring.", s);
+                LOG.info("No events for Situation: {}. Ignoring.", s);
                 continue;
             }
 
             situation.getAlarmRef().addAll(getCausalityTree(s, alarmsInSituation));
             situations.getSituation().add(situation);
         }
+    }
 
+    private void processAlarmsAndDeriveInventory() {
         if (!modelGenerationDisabled) {
             LOG.info("Generating inventory and meta-model...");
             final OnmsOceModelGenerator generator = new OnmsOceModelGenerator(allAlarms);
-            generator.generate(nodeId, nodeLabel);
+            generator.generate();
 
             metaModel = generator.getMetaModel();
             inventory = generator.getInventory();
@@ -200,7 +210,6 @@ public class OnmsOceGenerator  {
         }
 
         LOG.info("Generating the list of alarms...");
-        alarms = new Alarms();
 
         // Process each alarm
         allAlarms.forEach((a) -> {
@@ -208,7 +217,7 @@ public class OnmsOceGenerator  {
             alarm.setId(Integer.toString(a.getId()));
             alarm.setSummary(a.getLogMessage());
             alarm.setDescription(a.getLogMessage());
-            // FIXME - SEVERITY - alarm.setLastSeverity(toSeverity(lastAlarm.get));
+            alarm.setLastSeverity(alarm.getLastSeverity());
             alarm.setFirstEventTime(a.getLifespan().getStartMs());
             alarm.setLastEventTime(a.getLifespan().getEndMs());
             alarms.getAlarm().add(alarm);
@@ -219,15 +228,18 @@ public class OnmsOceGenerator  {
             for (ESEventDTO e : eventsInAlarms) {
                 final Event event = new Event();
                 event.setId(e.getId().toString());
-                // TODO - event.setSummary(e.getDescription());
-                // TODO - eventDocutmentDTO 'eventdescr'
+                event.setSummary(e.getLogMessage());
                 event.setDescription(e.getLogMessage());
                 event.setSeverity(toSeverity(e.getSeverity()));
-                // TODO event.setSource(e.getSource());
+                event.setSource(getSourceForEvent(e));
                 event.setTime(e.getTimestamp().getTime());
                 alarm.getEvent().add(event);
             }
         });
+    }
+
+    private String getSourceForEvent(ESEventDTO e) {
+        return Strings.isNullOrEmpty(e.getSyslogMessage()) ? "trap" : "syslog";
     }
 
     public void writeResultsToDisk(String prefix) {
