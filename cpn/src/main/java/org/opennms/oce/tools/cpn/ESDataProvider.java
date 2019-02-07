@@ -76,7 +76,11 @@ public class ESDataProvider {
     }
 
     public TicketRecord getTicketRecord(int id) throws IOException {
-        Get get = new Get.Builder("tickets", Integer.toString(id)).type("ticket").build();
+        return getTicketRecord(Integer.valueOf(id).longValue());
+    }
+
+    public TicketRecord getTicketRecord(long id) throws IOException {
+        Get get = new Get.Builder("tickets", Long.toString(id)).type("ticket").build();
         JestResult result = esClient.getJestClient().execute(get);
         return result.getSourceAsObject(TicketRecord.class);
     }

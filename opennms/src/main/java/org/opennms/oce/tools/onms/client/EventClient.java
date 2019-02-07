@@ -223,7 +223,7 @@ public class EventClient {
         final Search search = new Search.Builder(searchSourceBuilder.toString())
                 .addIndex(esClusterConfiguration.getOpennmsEventIndex())
                 .addSort(new Sort("@timestamp"))
-                .setParameter(Parameters.SCROLL, "5m")
+                //.setParameter(Parameters.SCROLL, "5m")
                 .build();
 
         final List<ESEventDTO> matchedEvents = new ArrayList<>();
@@ -353,6 +353,9 @@ public class EventClient {
             callback.accept(hits.stream().map(h -> h.source).collect(Collectors.toList()));
 
             // Scroll
+            if (!result.getJsonObject().has("_scroll_id")) {
+                return;
+            }
             String scrollId = result.getJsonObject().getAsJsonPrimitive("_scroll_id").getAsString();
             SearchScroll scroll = new SearchScroll.Builder(scrollId, "5m").build();
             result = client.execute(scroll);

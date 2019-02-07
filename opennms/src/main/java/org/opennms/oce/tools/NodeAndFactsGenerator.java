@@ -68,7 +68,6 @@ import org.opennms.oce.tools.tsaudit.NodeAndFacts;
 import org.opennms.oce.tools.tsaudit.OnmsAlarmSummary;
 import org.opennms.oce.tools.tsaudit.SituationAndEvents;
 import org.opennms.oce.tools.tsaudit.StateCache;
-import org.opennms.oce.tools.tsaudit.TSAudit;
 import org.opennms.oce.tools.tsaudit.TicketAndEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -153,8 +152,6 @@ public class NodeAndFactsGenerator {
     }
 
     public List<NodeAndFacts> getNodesAndFacts() throws IOException {
-        final List<NodeAndFacts> nodesAndFacts = new LinkedList<>();
-
         // Build the unique set of hostnames by scrolling through all locations and extracting
         // the hostname portion
         final Set<String> hostnames = new LinkedHashSet<>();
@@ -164,6 +161,11 @@ public class NodeAndFactsGenerator {
             }
         });
 
+        return getNodesAndFacts(hostnames);
+    }
+
+    public List<NodeAndFacts> getNodesAndFacts(Set<String> hostnames) throws IOException {
+        final List<NodeAndFacts> nodesAndFacts = new LinkedList<>();
         // Build the initial objects from the set of hostname
         for (String hostname : hostnames) {
             // Apply the hostname filters (could be also done in the query above to improve performance)
