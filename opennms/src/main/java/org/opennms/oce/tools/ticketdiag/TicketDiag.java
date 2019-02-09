@@ -53,7 +53,9 @@ import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
 import org.opennms.oce.tools.tsaudit.NodeAndEvents;
 import org.opennms.oce.tools.tsaudit.NodeAndFacts;
+import org.opennms.oce.tools.tsaudit.OnmsAlarmSummary;
 import org.opennms.oce.tools.tsaudit.SituationAndEvents;
+import org.opennms.oce.tools.tsaudit.SituationsAlarmsAndEvents;
 
 public class TicketDiag {
 
@@ -137,12 +139,10 @@ public class TicketDiag {
 
         // Build the tree on the other side
         final Map<String, Integer> cpnEventIdToOnmsEventIds = new LinkedHashMap<>();
-        final Map<Integer, Integer> onmsEventIdToSituationId = new LinkedHashMap<>();
+        final Map<Integer, Integer> onmsEventIdToAlarmId = new LinkedHashMap<>();
+        final Map<Integer, Integer> alarmIdToSituationId = new LinkedHashMap<>();
+        final Map<Integer, OnmsAlarmSummary> alarmsById = new LinkedHashMap<>();
         final Map<Integer, SituationAndEvents> situationsById = new LinkedHashMap<>();
-
-        // Unmatched
-        final List<EventRecord> unmatchedCpnEvents = new LinkedList<>();
-        final List<ESEventDTO> unmatchedOnmsEvents = new LinkedList<>();
 
         for (NodeAndFacts nodeAndFact : nodesAndFacts) {
             final NodeAndEvents nodeAndEvents = nodeAndFactsGenerator.retrieveAndPairEvents(nodeAndFact);
@@ -150,39 +150,18 @@ public class TicketDiag {
                 cpnEventIdToOnmsEventIds.put(cpnEventIdToOnmsEventId.getKey(), cpnEventIdToOnmsEventId.getValue());
             }
 
-            final List<SituationAndEvents> situationsAndEvents = nodeAndFactsGenerator.getSituationsAndPairEvents(nodeAndEvents);
-            for (SituationAndEvents situationAndEvents : situationsAndEvents) {
-                situationsById.put(situationAndEvents.getId(), situationAndEvents);
-                for (ESEventDTO esEventDTO : situationAndEvents.getEventsInSituation()) {
-                    onmsEventIdToSituationId.put(esEventDTO.getId(), situationAndEvents.getId());
-                }
-            }
-
-            unmatchedCpnEvents.addAll(nodeAndEvents.getUnmatchedCpnEvents());
-            unmatchedOnmsEvents.addAll(nodeAndEvents.getUnmatchedOnmsEvents());
+            final SituationsAlarmsAndEvents situationsAlarmsAndEvents = nodeAndFactsGenerator.getSituationsAlarmsAndEvents(nodeAndEvents);
+            onmsEventIdToAlarmId.putAll(situationsAlarmsAndEvents.getEventIdToAlarmId());
+            alarmIdToSituationId.putAll(situationsAlarmsAndEvents.getAlarmIdToSituationId());
+            situationsById.putAll(situationsAlarmsAndEvents.getSituationsById());
         }
-
-
-        // Let's look at the events that were not matched
-        if (!unmatchedCpnEvents.isEmpty()) {
-            System.out.println("\n\nUnmatched events:");
-            unmatchedCpnEvents.sort(Comparator.comparing(EventRecord::getTime));
-            unmatchedOnmsEvents.sort(Comparator.comparing(ESEventDTO::getTimestamp));
-            for (EventRecord e : unmatchedCpnEvents) {
-                System.out.println(e);
-            }
-            for (ESEventDTO e : unmatchedOnmsEvents) {
-                System.out.println(e);
-            }
-            System.out.println("\n\n");
-        }
-
 
         for (EventRecord e : eventsInTicket) {
             Integer onmsEventId = cpnEventIdToOnmsEventIds.get(e.getEventId());
-            Integer situationId = onmsEventId != null ? onmsEventIdToSituationId.get(onmsEventId) : null;
-            System.out.printf("CPN Event: %s (%s - %s) -> OpenNMS Event ID: %s -> OpenNMS Situation ID: %s\n",
-                    e.getEventId(), e.getSource(), e.getTime(), onmsEventId, situationId);
+            Integer alarmId = onmsEventId != null ? onmsEventIdToAlarmId.get(onmsEventId) : null;
+            Integer situationId = alarmId != null ? alarmIdToSituationId.get(alarmId) : null;
+            System.out.printf("CPN Event: %s (%s - %s) -> OpenNMS Event ID: %s -> OpenNMS Alarm ID: %s -> OpenNMS Situation ID: %s\n",
+                    e.getEventId(), e.getSource(), e.getTime(), onmsEventId, alarmId, situationId);
             if (onmsEventId == null) {
                 System.out.printf("\t%s\n", e);
             }

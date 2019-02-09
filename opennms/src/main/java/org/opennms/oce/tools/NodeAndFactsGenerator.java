@@ -67,6 +67,7 @@ import org.opennms.oce.tools.tsaudit.NodeAndEvents;
 import org.opennms.oce.tools.tsaudit.NodeAndFacts;
 import org.opennms.oce.tools.tsaudit.OnmsAlarmSummary;
 import org.opennms.oce.tools.tsaudit.SituationAndEvents;
+import org.opennms.oce.tools.tsaudit.SituationsAlarmsAndEvents;
 import org.opennms.oce.tools.tsaudit.StateCache;
 import org.opennms.oce.tools.tsaudit.TicketAndEvents;
 import org.slf4j.Logger;
@@ -381,6 +382,10 @@ public class NodeAndFactsGenerator {
     }
 
     public List<SituationAndEvents> getSituationsAndPairEvents(NodeAndEvents nodeAndEvents) throws IOException {
+        return getSituationsAlarmsAndEvents(nodeAndEvents).getSituationsAndEvents();
+    }
+
+    public SituationsAlarmsAndEvents getSituationsAlarmsAndEvents(NodeAndEvents nodeAndEvents) throws IOException {
         // Retrieve the situations and alarms
         final int nodeId = nodeAndEvents.getNodeAndFacts().getOpennmsNodeId();
         final List<AlarmDocumentDTO> allSituationDtos = eventClient.getSituationsOnNodeId(startMs, endMs, nodeId);
@@ -469,13 +474,13 @@ public class NodeAndFactsGenerator {
 
             situationsAndEvents.add(new SituationAndEvents(situationDtos, situationLifespan, allEventsInSituation, alarmSummaries));
         }
-        return situationsAndEvents;
+        return new SituationsAlarmsAndEvents(nodeAndEvents, situationsAndEvents, alarmDtos);
     }
 
     /**
      * Compute the lifespan of an alarm given some subset of the it's alarm documents.
      */
-    private static Lifespan getLifespan(List<AlarmDocumentDTO> alarmDtos, long startMs, long endMs) {
+    public static Lifespan getLifespan(List<AlarmDocumentDTO> alarmDtos, long startMs, long endMs) {
         // Use the first-event time of the first record, or default to startMs if none was found
         final long minTime = alarmDtos.stream()
                 .filter(a -> a.getDeletedTime() == null)
