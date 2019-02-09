@@ -32,11 +32,12 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 
+import org.opennms.oce.opennms.model.ManagedObjectType;
 import org.opennms.oce.tools.cpn.events.EventRecordLite;
 
 public class EventDefinition implements  EventRecordMatcher {
     private final EventRecordMatcher matcher;
-    private final Set<ModelObjectType> types;
+    private final Set<ManagedObjectType> types;
     private final Function<EventRecordLite, ModelObject> moBuilder;
     private boolean isIgnored = false;
 
@@ -47,7 +48,7 @@ public class EventDefinition implements  EventRecordMatcher {
      * @param types of model objects generated
      * @param moBuilder used to generate the model object tree
      */
-    protected EventDefinition(EventRecordMatcher matcher, Set<ModelObjectType> types, Function<EventRecordLite, ModelObject> moBuilder) {
+    protected EventDefinition(EventRecordMatcher matcher, Set<ManagedObjectType> types, Function<EventRecordLite, ModelObject> moBuilder) {
         this.matcher = Objects.requireNonNull(matcher);
         this.types = Objects.requireNonNull(types);
         this.moBuilder = Objects.requireNonNull(moBuilder);

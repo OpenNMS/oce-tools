@@ -37,7 +37,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 
-import org.opennms.oce.datasource.common.inventory.ManagedObjectType;
+import org.opennms.oce.opennms.model.ManagedObjectType;
 import org.opennms.oce.datasource.v1.schema.Inventory;
 import org.opennms.oce.datasource.v1.schema.MetaModel;
 import org.opennms.oce.datasource.v1.schema.ModelObjectDef;
@@ -48,8 +48,6 @@ import org.opennms.oce.datasource.v1.schema.PeerRef;
 import org.opennms.oce.datasource.v1.schema.RelativeDefRef;
 import org.opennms.oce.datasource.v1.schema.RelativeRef;
 import org.opennms.oce.tools.cpn2oce.model.ModelObject;
-import org.opennms.oce.tools.cpn2oce.model.ModelObjectType;
-import org.opennms.oce.tools.onms.alarmdto.EventDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.tsaudit.OnmsAlarmSummary;
 import org.slf4j.Logger;
@@ -97,18 +95,18 @@ public class OnmsOceModelGenerator {
         rootModelDef.getParentDefRef().add(rootModelParentDefRef);
         modelObjectDefs.add(rootModelDef);
 
-        final Map<ModelObjectType, List<ModelObject>> allMosByType = allMos.stream()
+        final Map<ManagedObjectType, List<ModelObject>> allMosByType = allMos.stream()
                 .collect(groupingBy(ModelObject::getType));
 
         metaModel = new MetaModel();
-        for (Map.Entry<ModelObjectType, List<ModelObject>> entry : allMosByType.entrySet()) {
-            final ModelObjectType type = entry.getKey();
+        for (Map.Entry<ManagedObjectType, List<ModelObject>> entry : allMosByType.entrySet()) {
+            final ManagedObjectType type = entry.getKey();
             final ModelObjectDef def = new ModelObjectDef();
             def.setType(type.toString());
 
-            final Set<ModelObjectType> parentTypes = new LinkedHashSet<>();
-            final Set<ModelObjectType> peerTypes = new LinkedHashSet<>();
-            final Set<ModelObjectType> uncleTypes = new LinkedHashSet<>();
+            final Set<ManagedObjectType> parentTypes = new LinkedHashSet<>();
+            final Set<ManagedObjectType> peerTypes = new LinkedHashSet<>();
+            final Set<ManagedObjectType> uncleTypes = new LinkedHashSet<>();
             for (ModelObject mo : entry.getValue()) {
                 if (mo.hasParent()) {
                     parentTypes.add(mo.getParent().getType());
@@ -122,7 +120,7 @@ public class OnmsOceModelGenerator {
             }
 
             if (parentTypes.size() > 0) {
-                for (ModelObjectType parentType : parentTypes) {
+                for (ManagedObjectType parentType : parentTypes) {
                     ParentDefRef parentDefRef = new ParentDefRef();
                     parentDefRef.setType(parentType.toString());
                     def.getParentDefRef().add(parentDefRef);
@@ -131,13 +129,13 @@ public class OnmsOceModelGenerator {
                 def.getParentDefRef().add(rootModelParentDefRef);
             }
 
-            for (ModelObjectType peerType : peerTypes) {
+            for (ManagedObjectType peerType : peerTypes) {
                 PeerDefRef peerDefRef = new PeerDefRef();
                 peerDefRef.setType(peerType.toString());
                 def.getPeerDefRef().add(peerDefRef);
             }
 
-            for (ModelObjectType uncleType : uncleTypes) {
+            for (ManagedObjectType uncleType : uncleTypes) {
                 RelativeDefRef relativeDefRef = new RelativeDefRef();
                 relativeDefRef.setType(uncleType.toString());
                 def.getRelativeDefRef().add(relativeDefRef);
@@ -159,7 +157,7 @@ public class OnmsOceModelGenerator {
         modelRootEntry.setParentId(MODEL_ROOT_ID);
         inventory.getModelObjectEntry().add(modelRootEntry);
 
-        for (Map.Entry<ModelObjectType, List<ModelObject>> mosByType : allMosByType.entrySet()) {
+        for (Map.Entry<ManagedObjectType, List<ModelObject>> mosByType : allMosByType.entrySet()) {
             for (ModelObject mo : mosByType.getValue()) {
                 ModelObjectEntry moe = new ModelObjectEntry();
 
@@ -218,14 +216,12 @@ public class OnmsOceModelGenerator {
     }
 
     public static ModelObject getModelObject(OnmsAlarmSummary alarm) {
-        // Only derive inventory if the alarm has an MO type and instance and at least one event
-        if (Strings.isNullOrEmpty(alarm.getManagedObjectType()) || Strings.isNullOrEmpty(alarm.getManagedObjectInstance()) || alarm.getEvents() == null
-                || alarm.getEvents().isEmpty()) {
+        // Only derive inventory if the alarm has an MO type and instance
+        if (Strings.isNullOrEmpty(alarm.getManagedObjectType()) || Strings.isNullOrEmpty(alarm.getManagedObjectInstance())) {
             return null;
         }
 
-        ManagedObjectType type;
-
+        final ManagedObjectType type;
         try {
             type = ManagedObjectType.fromName(alarm.getManagedObjectType());
         } catch (NoSuchElementException nse) {
@@ -233,34 +229,7 @@ public class OnmsOceModelGenerator {
             return null;
         }
 
-        ESEventDTO firstEvent = alarm.getEvents().get(0);
-        if (firstEvent == null || firstEvent.getNodeId() == null) {
-            // data error
-            return null;
-        }
-        String nodeId = firstEvent.getNodeId().toString();
-        String nodeLabel = firstEvent.getNodeLabel();
-
-        ModelObject node = new ModelObject(nodeId, nodeLabel, ModelObjectType.DEVICE);
-
-        switch (type) {
-
-        case SnmpInterface:
-            return new ModelObject(nodeId + ":" + alarm.getManagedObjectInstance(), alarm.getManagedObjectInstance(), ModelObjectType.PORT, node);
-
-        case Node:
-            return node;
-
-        case EntPhysicalEntity:
-            // TODO - hack
-            return new ModelObject(nodeId, nodeLabel, ModelObjectType.FAN_TRAY, node);
-
-        case BgpPeer:
-            return new ModelObject(nodeId, nodeLabel, ModelObjectType.BGP_PEER);
-
-        default:
-            return null;
-        }
+        return new ModelObject(alarm.getManagedObjectInstance(), null, type);
     }
 
 }

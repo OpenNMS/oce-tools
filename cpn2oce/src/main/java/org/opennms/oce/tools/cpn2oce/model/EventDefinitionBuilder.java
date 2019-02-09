@@ -36,12 +36,13 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 
+import org.opennms.oce.opennms.model.ManagedObjectType;
 import org.opennms.oce.tools.cpn.events.EventRecordLite;
 
 public class EventDefinitionBuilder {
 
     private final List<EventRecordMatcher> matchers = new ArrayList<>();
-    private final Set<ModelObjectType> types = new LinkedHashSet<>();
+    private final Set<ManagedObjectType> types = new LinkedHashSet<>();
     private Function<EventRecordLite, ModelObject> moBuilder;
     private boolean isIgnored = false;
 
@@ -50,7 +51,7 @@ public class EventDefinitionBuilder {
         return this;
     }
 
-    public EventDefinitionBuilder withType(ModelObjectType type) {
+    public EventDefinitionBuilder withType(ManagedObjectType type) {
         this.types.add(type);
         return this;
     }

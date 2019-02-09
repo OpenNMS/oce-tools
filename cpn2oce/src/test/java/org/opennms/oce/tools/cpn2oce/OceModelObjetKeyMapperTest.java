@@ -47,14 +47,14 @@ public class OceModelObjetKeyMapperTest {
         List<ModelObjectKey> keys = OceModelObjetKeyMapper.getRelatedObjectIds(mo);
 
         assertThat(keys, containsInAnyOrder(
-                new ModelObjectKey("DEVICE,agg-red","PORT,agg-red: BundleEthernet1.3509","LINK,agg-red: BundleEthernet1.3509<->agg-blue: BundleEthernet1.3509" ),
-                new ModelObjectKey("DEVICE,agg-blue","PORT,agg-blue: BundleEthernet1.3509","LINK,agg-red: BundleEthernet1.3509<->agg-blue: BundleEthernet1.3509")
+                new ModelObjectKey("Node,agg-red","SnmpInterface,agg-red: BundleEthernet1.3509","SnmpInterfaceLink,agg-red: BundleEthernet1.3509<->agg-blue: BundleEthernet1.3509" ),
+                new ModelObjectKey("Node,agg-blue","SnmpInterface,agg-blue: BundleEthernet1.3509","SnmpInterfaceLink,agg-red: BundleEthernet1.3509<->agg-blue: BundleEthernet1.3509")
         ));
 
         mo = mapper.parse("CPU utilization exceeded upper threshold", "infra-blue");
         keys = OceModelObjetKeyMapper.getRelatedObjectIds(mo);
         assertThat(keys, contains(
-                new ModelObjectKey("DEVICE,infra-blue", "CPU,CPU on infra-blue")
+                new ModelObjectKey("Node,infra-blue", "EntPhysicalEntity,CPU on infra-blue")
         ));
 
     }

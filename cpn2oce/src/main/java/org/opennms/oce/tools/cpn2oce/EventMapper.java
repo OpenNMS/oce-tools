@@ -32,12 +32,12 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.opennms.oce.opennms.model.ManagedObjectType;
 import org.opennms.oce.tools.cpn.events.EventRecordLite;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn2oce.model.CanonicalEventRecordLite;
 import org.opennms.oce.tools.cpn2oce.model.EventDefinition;
 import org.opennms.oce.tools.cpn2oce.model.ModelObject;
-import org.opennms.oce.tools.cpn2oce.model.ModelObjectType;
 
 import com.google.common.collect.Lists;
 
@@ -87,8 +87,8 @@ public class EventMapper {
                     .forDescr("Fex Port Status Noti Configure")
                     .forDescr("Link down due to admin down")
                     .forDescr("Link down due to oper down")
-                    .withType(ModelObjectType.PORT)
-                    .withType(ModelObjectType.LINK)
+                    .withType(ManagedObjectType.SnmpInterface)
+                    .withType(ManagedObjectType.SnmpInterfaceLink)
                     .withMoBuilder(EventMapper::createLinkOrPortObject)
                     .build(),
             // BGP related events
@@ -112,8 +112,8 @@ public class EventMapper {
                     .forDescr("Cisco BGP established trap")
                     .forDescr("BGP trap stopped flapping non cleared")
                     .forDescr("BGP established trap")
-                    .withType(ModelObjectType.BGP_PEER)
-                    .withType(ModelObjectType.DEVICE)
+                    .withType(ManagedObjectType.BgpPeer)
+                    .withType(ManagedObjectType.Node)
                     .withMoBuilder(EventMapper::createBgpPeerObject)
                     .build(),
             // Device related events
@@ -132,21 +132,21 @@ public class EventMapper {
                     .forDescr("Device configuration validation passed")
                     .forDescr("Device configuration validation failed")
                     .forDescr("sensor value crossed threshold in entSensorThresholdTable")
-                    .withType(ModelObjectType.DEVICE)
+                    .withType(ManagedObjectType.Node)
                     .withMoBuilder(EventMapper::createDeviceObject)
                     .build(),
             // BFD connectivity related events
             EventDefinition.builder()
                     .forDescr("BFD connectivity down")
                     .forDescr("BFD connectivity up")
-                    .withType(ModelObjectType.LINK)
+                    .withType(ManagedObjectType.SnmpInterfaceLink)
                     .withMoBuilder(EventMapper::createLinkObject)
                     .build(),
             // BFD neighbor related events
             EventDefinition.builder()
                     .forDescr("BFD neighbor loss")
                     .forDescr("BFD neighbor found")
-                    .withType(ModelObjectType.PORT)
+                    .withType(ManagedObjectType.SnmpInterface)
                     .withMoBuilder(EventMapper::createBfgNeighborObject)
                     .build(),
             // Link related events
@@ -156,27 +156,27 @@ public class EventMapper {
                     .forDescr("Discarded packet rate exceeded upper threshold")
                     .forDescr("Link utilization normal")
                     .forDescr("Link over utilized")
-                    .withType(ModelObjectType.LINK)
+                    .withType(ManagedObjectType.SnmpInterfaceLink)
                     .withMoBuilder(EventMapper::createLinkObject)
                     .build(),
             // MPLS interface related events
             EventDefinition.builder()
                     .forDescr("MPLS interface removed")
                     .forDescr("MPLS interface added")
-                    .withType(ModelObjectType.MPLS)
+                    .withType(ManagedObjectType.Node) // TODO: Remodel
                     .withMoBuilder(EventMapper::createMplsInterfaceObject)
                     .build(),
             // MPLS link related events
             EventDefinition.builder()
                     .forDescr("MPLS Link down")
-                    .withType(ModelObjectType.MPLS)
+                    .withType(ManagedObjectType.Node) // TODO: Remodel
                     .withMoBuilder(EventMapper::createMplsLinkObject)
                     .build(),
             // LDP related events
             EventDefinition.builder()
                     .forDescr("LDP neighbor down")
                     .forDescr("LDP neighbor up")
-                    .withType(ModelObjectType.LDP_NEIGHBOR)
+                    .withType(ManagedObjectType.Node) // TODO: Remodel
                     .withMoBuilder(EventMapper::createLdpObject)
                     .build(),
             // DS0 related events
@@ -184,7 +184,7 @@ public class EventMapper {
                     .forDescr("DS0 bundle admin down")
                     .forDescr("DS0 bundle up")
                     .forDescr("DS0 bundle oper down")
-                    .withType(ModelObjectType.PORT)
+                    .withType(ManagedObjectType.SnmpInterface)
                     .withMoBuilder(EventMapper::createPortObject)
                     .build(),
             // DS1 related events
@@ -192,7 +192,7 @@ public class EventMapper {
                     .forDescr("DS1 Path down due to Oper")
                     .forDescr("DS1 Path up")
                     .forDescr("DS1 Path down due to Admin")
-                    .withType(ModelObjectType.PORT)
+                    .withType(ManagedObjectType.SnmpInterface)
                     .withMoBuilder(EventMapper::createPortObject)
                     .build(),
             // TX/RX utilization related events
@@ -200,8 +200,8 @@ public class EventMapper {
                     .forDescr("Tx utilization is below lower threshold")
                     .forDescr("Tx utilization exceeded upper threshold")
                     .forDescr("Rx utilization is below lower threshold")
-                    .withType(ModelObjectType.PORT)
-                    .withType(ModelObjectType.LINK)
+                    .withType(ManagedObjectType.SnmpInterface)
+                    .withType(ManagedObjectType.SnmpInterfaceLink)
                     .withMoBuilder(EventMapper::createLinkOrPortObject)
                     .build(),
             // CPU related events
@@ -212,34 +212,34 @@ public class EventMapper {
                     .forDescr("Device CPU usage has consecutively crossed low threshold")
                     .forDescr("Device CPU is high. Synchronization temporarily suspended")
                     .forDescr("Device CPU is high. Preparing to suspend synchronization")
-                    .withType(ModelObjectType.CPU)
+                    .withType(ManagedObjectType.EntPhysicalEntity)
                     .withMoBuilder(EventMapper::createCpuObject)
                     .build(),
             // Power supply related events
             EventDefinition.builder()
                     .forDescr("Power Supply out")
-                    .withType(ModelObjectType.POWER_SUPPLY)
+                    .withType(ManagedObjectType.EntPhysicalEntity)
                     .withMoBuilder(EventMapper::createPowerSupplyObject)
                     .build(),
             // Fan related events
             EventDefinition.builder()
                     .forDescr("Fan out")
                     .forDescr("Fan in")
-                    .withType(ModelObjectType.FAN)
+                    .withType(ManagedObjectType.EntPhysicalEntity)
                     .withMoBuilder(EventMapper::createFanObject)
                     .build(),
             // Fan tray related events
             EventDefinition.builder()
                     .forDescr("Fan-tray out")
                     .forDescr("Fan-tray in")
-                    .withType(ModelObjectType.FAN_TRAY)
+                    .withType(ManagedObjectType.EntPhysicalEntity)
                     .withMoBuilder(EventMapper::createFanTrayObject)
                     .build(),
             // OSPF related events
             EventDefinition.builder()
                     .forDescr("OSPF link down")
                     .forDescr("OSPF link up")
-                    .withType(ModelObjectType.OSPF_LINK)
+                    .withType(ManagedObjectType.Node) // TODO: Removel
                     .withMoBuilder(EventMapper::createOspfLinkObject)
                     .build(),
             // Card related events
@@ -254,7 +254,7 @@ public class EventMapper {
                     .forDescr("Card status changed to up")
                     .forDescr("Card oper status syslog stopped flapping")
                     .forDescr("Card status changed to up")
-                    .withType(ModelObjectType.CARD)
+                    .withType(ManagedObjectType.Node) // TODO: Remodel
                     .withMoBuilder(EventMapper::createCardObject)
                     .build(),
             // LAG related events
@@ -263,14 +263,14 @@ public class EventMapper {
                     .forDescr("LAG down due to admin down")
                     .forDescr("Low priority member down")
                     .forDescr("All members operationally up")
-                    .withType(ModelObjectType.AGGREGATION_GROUP)
+                    .withType(ManagedObjectType.SnmpInterface)
                     .withMoBuilder(EventMapper::createAggregationGroupObject)
                     .build(),
             // EIGRP related events
             EventDefinition.builder()
                     .forDescr("DUAL 5 neighbor up syslog")
                     .forDescr("DUAL 5 neighbor down syslog")
-                    .withType(ModelObjectType.EIGRP_NEIGHBOR)
+                    .withType(ManagedObjectType.Node) // TODO: Remodel
                     .withMoBuilder(EventMapper::createEigrpNeighbor)
                     .build()
     );
@@ -313,7 +313,7 @@ public class EventMapper {
     }
 
     public static ModelObject createDeviceObject(EventRecordLite e) {
-        return new ModelObject(e.getLocation(), e.getLocation(), ModelObjectType.DEVICE);
+        return new ModelObject(e.getLocation(), e.getLocation(), ManagedObjectType.Node);
     }
 
     public static ModelObject createBgpPeerObject(EventRecordLite e) {
@@ -325,13 +325,13 @@ public class EventMapper {
             String peer = m.group(2);
             String vrf = m.group(3);
 
-            ModelObject parentNode = new ModelObject(device, device, ModelObjectType.DEVICE);
-            ModelObject peerNode = new ModelObject(String.format("%s: MpBgp: %s", device, peer), peer, ModelObjectType.BGP_PEER, parentNode);
+            ModelObject parentNode = new ModelObject(device, device, ManagedObjectType.Node);
+            ModelObject peerNode = new ModelObject(String.format("%s: MpBgp: %s", device, peer), peer, ManagedObjectType.BgpPeer, parentNode);
 
             /* FIXME: How to handle VRFs when we don't always know about them?
-            ModelObject parentNode = new ModelObject(device, device, ModelObjectType.DEVICE);
+            ModelObject parentNode = new ModelObject(device, device, ManagedObjectType.Node);
             ModelObject vrfNode = new ModelObject(device + ": " + vrf, vrf, ModelObjectType.BGP_VRF, parentNode);
-            ModelObject peerNode = new ModelObject(location, peer, ModelObjectType.BGP_PEER, vrfNode);
+            ModelObject peerNode = new ModelObject(location, peer, ManagedObjectType.BgpPeer, vrfNode);
             */
             return peerNode;
         }
@@ -342,14 +342,14 @@ public class EventMapper {
             String device = m.group(1);
             String peer = m.group(2);
 
-            ModelObject parentNode = new ModelObject(device, device, ModelObjectType.DEVICE);
-            ModelObject peerNode = new ModelObject(location, peer, ModelObjectType.BGP_PEER, parentNode);
+            ModelObject parentNode = new ModelObject(device, device, ManagedObjectType.Node);
+            ModelObject peerNode = new ModelObject(location, peer, ManagedObjectType.BgpPeer, parentNode);
             return peerNode;
         }
 
         if (!location.contains(" ")) {
             // No spaces, we probably just have a device
-            return new ModelObject(location,location, ModelObjectType.DEVICE);
+            return new ModelObject(location,location, ManagedObjectType.Node);
         }
 
         throw new IllegalArgumentException("Failed to parse: " + location);
@@ -371,9 +371,9 @@ public class EventMapper {
             String device = m.group(1);
             String port = m.group(2);
             String neigh = m.group(3);
-            ModelObject parentNode = new ModelObject(device, device,  ModelObjectType.DEVICE);
-            ModelObject portNode = new ModelObject(String.format("%s: %s", device, port), port, ModelObjectType.PORT, parentNode);
-            ModelObject neighborNode = new ModelObject(location, neigh, ModelObjectType.EIGRP_NEIGHBOR, portNode);
+            ModelObject parentNode = new ModelObject(device, device,  ManagedObjectType.Node);
+            ModelObject portNode = new ModelObject(String.format("%s: %s", device, port), port, ManagedObjectType.SnmpInterface, parentNode);
+            ModelObject neighborNode = new ModelObject(location, neigh, ManagedObjectType.Node, portNode);
             return neighborNode;
         }
         throw new IllegalArgumentException("Could not parse: " + location);
@@ -386,8 +386,8 @@ public class EventMapper {
         if (m.matches()) {
             String device = m.group(1);
             String port = m.group(3);
-            ModelObject parentNode = new ModelObject(device, device,  ModelObjectType.DEVICE);
-            ModelObject portNode = new ModelObject(location, port, ModelObjectType.PORT, parentNode);
+            ModelObject parentNode = new ModelObject(device, device,  ManagedObjectType.Node);
+            ModelObject portNode = new ModelObject(location, port, ManagedObjectType.SnmpInterface, parentNode);
             return portNode;
         }
 
@@ -396,22 +396,22 @@ public class EventMapper {
             tokens = location.split(":");
             if (tokens.length == 1) {
                 // No port information, use the device directly
-                ModelObject parentDevice = new ModelObject(tokens[0], tokens[0], ModelObjectType.DEVICE);
-                return new ModelObject(location, "0", ModelObjectType.PORT, parentDevice);
+                ModelObject parentDevice = new ModelObject(tokens[0], tokens[0], ManagedObjectType.Node);
+                return new ModelObject(location, "0", ManagedObjectType.SnmpInterface, parentDevice);
             } else if (tokens.length != 2) {
                 throw new IllegalArgumentException("Could not parse: " + location);
             }
             tokens[1] = tokens[1].trim();
         }
 
-        ModelObject parentDevice = new ModelObject(tokens[0], tokens[0], ModelObjectType.DEVICE);
-        return new ModelObject(location, tokens[1], ModelObjectType.PORT, parentDevice);
+        ModelObject parentDevice = new ModelObject(tokens[0], tokens[0], ManagedObjectType.Node);
+        return new ModelObject(location, tokens[1], ManagedObjectType.SnmpInterface, parentDevice);
     }
 
     public static ModelObject createCpuObject(EventRecordLite e) {
         final String location = e.getLocation();
-        final ModelObject parentDevice = new ModelObject(location, location, ModelObjectType.DEVICE);
-        return new ModelObject("CPU on " + location, "CPU", ModelObjectType.CPU, parentDevice);
+        final ModelObject parentDevice = new ModelObject(location, location, ManagedObjectType.Node);
+        return new ModelObject("CPU on " + location, "CPU", ManagedObjectType.EntPhysicalEntity, parentDevice);
     }
 
 
@@ -423,9 +423,9 @@ public class EventMapper {
             String device = m.group(1);
             String iff = m.group(2);
 
-            ModelObject parentNode = new ModelObject(device, device, ModelObjectType.DEVICE);
-            ModelObject ifNode = new ModelObject(device + ": " + iff, iff, ModelObjectType.PORT, parentNode);
-            ModelObject mplsNode = new ModelObject(location, "MPLS on interface " + iff, ModelObjectType.MPLS);
+            ModelObject parentNode = new ModelObject(device, device, ManagedObjectType.Node);
+            ModelObject ifNode = new ModelObject(device + ": " + iff, iff, ManagedObjectType.SnmpInterface, parentNode);
+            ModelObject mplsNode = new ModelObject(location, "MPLS on interface " + iff, ManagedObjectType.Node);
             mplsNode.addNephew(ifNode);
             return mplsNode;
         }
@@ -443,13 +443,13 @@ public class EventMapper {
             String deviceB = m.group(3);
             String portB = m.group(4);
 
-            ModelObject deviceANode = new ModelObject(deviceA, deviceA, ModelObjectType.DEVICE);
-            ModelObject portANode = new ModelObject(deviceA + ": " + portA, portA, ModelObjectType.PORT, deviceANode);
-            ModelObject deviceBNode = new ModelObject(deviceB, deviceB, ModelObjectType.DEVICE);
-            ModelObject portBNode = new ModelObject(deviceB + ": " + portB, portB, ModelObjectType.PORT, deviceBNode);
+            ModelObject deviceANode = new ModelObject(deviceA, deviceA, ManagedObjectType.Node);
+            ModelObject portANode = new ModelObject(deviceA + ": " + portA, portA, ManagedObjectType.SnmpInterface, deviceANode);
+            ModelObject deviceBNode = new ModelObject(deviceB, deviceB, ManagedObjectType.Node);
+            ModelObject portBNode = new ModelObject(deviceB + ": " + portB, portB, ManagedObjectType.SnmpInterface, deviceBNode);
             List<ModelObject> peers = Lists.newArrayList(portANode, portBNode);
-            ModelObject linkNode = new ModelObject(location, location, ModelObjectType.LINK, peers);
-            ModelObject mplsNode = new ModelObject(location, location, ModelObjectType.MPLS);
+            ModelObject linkNode = new ModelObject(location, location, ManagedObjectType.SnmpInterfaceLink, peers);
+            ModelObject mplsNode = new ModelObject(location, location, ManagedObjectType.Node);
             mplsNode.addNephew(linkNode);
             return mplsNode;
         }
@@ -464,8 +464,8 @@ public class EventMapper {
             String device = m.group(1);
             String ldpNeigh = m.group(2);
 
-            ModelObject parentNode = new ModelObject(device, device, ModelObjectType.DEVICE);
-            ModelObject ldpNode = new ModelObject(location, ldpNeigh, ModelObjectType.LDP_NEIGHBOR, parentNode);
+            ModelObject parentNode = new ModelObject(device, device, ManagedObjectType.Node);
+            ModelObject ldpNode = new ModelObject(location, ldpNeigh, ManagedObjectType.Node, parentNode);
             return ldpNode;
         }
         throw new IllegalArgumentException("Failed to parse: " + location);
@@ -481,8 +481,8 @@ public class EventMapper {
             String peerA = m.group(3);
             String peerZ = m.group(4);
 
-            ModelObject deviceNode = new ModelObject(device, device, ModelObjectType.DEVICE);
-            ModelObject portNode = new ModelObject(device + ": " + port, port, ModelObjectType.PORT, deviceNode);
+            ModelObject deviceNode = new ModelObject(device, device, ManagedObjectType.Node);
+            ModelObject portNode = new ModelObject(device + ": " + port, port, ManagedObjectType.SnmpInterface, deviceNode);
             return portNode;
         }
         throw new IllegalArgumentException("Failed to parse: " + location);
@@ -496,8 +496,8 @@ public class EventMapper {
             String device = m.group(1);
             String fanTray = m.group(2);
 
-            ModelObject deviceNode = new ModelObject(device, device, ModelObjectType.DEVICE);
-            ModelObject fanTrayNode = new ModelObject(location, fanTray, ModelObjectType.FAN_TRAY, deviceNode);
+            ModelObject deviceNode = new ModelObject(device, device, ManagedObjectType.Node);
+            ModelObject fanTrayNode = new ModelObject(location, fanTray, ManagedObjectType.EntPhysicalEntity, deviceNode);
             return fanTrayNode;
         }
         throw new IllegalArgumentException("Failed to parse: " + location);
@@ -513,12 +513,12 @@ public class EventMapper {
             String deviceB = m.group(3);
             String portB = m.group(4);
 
-            ModelObject deviceANode = new ModelObject(deviceA, deviceA, ModelObjectType.DEVICE);
-            ModelObject portANode = new ModelObject(deviceA + ": " + portA, portA, ModelObjectType.PORT, deviceANode);
-            ModelObject deviceBNode = new ModelObject(deviceB, deviceB, ModelObjectType.DEVICE);
-            ModelObject portBNode = new ModelObject(deviceB + ": " + portB, portB, ModelObjectType.PORT, deviceBNode);
+            ModelObject deviceANode = new ModelObject(deviceA, deviceA, ManagedObjectType.Node);
+            ModelObject portANode = new ModelObject(deviceA + ": " + portA, portA, ManagedObjectType.SnmpInterface, deviceANode);
+            ModelObject deviceBNode = new ModelObject(deviceB, deviceB, ManagedObjectType.Node);
+            ModelObject portBNode = new ModelObject(deviceB + ": " + portB, portB, ManagedObjectType.SnmpInterface, deviceBNode);
             List<ModelObject> peers = Lists.newArrayList(portANode, portBNode);
-            return new ModelObject(location, location, ModelObjectType.LINK, peers);
+            return new ModelObject(location, location, ManagedObjectType.SnmpInterfaceLink, peers);
         }
         p = Pattern.compile("^(.*): (.*) (.*)$");
         m = p.matcher(location);
@@ -527,11 +527,11 @@ public class EventMapper {
             String portA = m.group(2);
             String portB = m.group(3);
 
-            ModelObject deviceANode = new ModelObject(deviceA, deviceA, ModelObjectType.DEVICE);
-            ModelObject portANode = new ModelObject(deviceA + ": " + portA, portA, ModelObjectType.PORT, deviceANode);
-            ModelObject portBNode = new ModelObject(deviceA + ": " + portB, portB, ModelObjectType.PORT, deviceANode);
+            ModelObject deviceANode = new ModelObject(deviceA, deviceA, ManagedObjectType.Node);
+            ModelObject portANode = new ModelObject(deviceA + ": " + portA, portA, ManagedObjectType.SnmpInterface, deviceANode);
+            ModelObject portBNode = new ModelObject(deviceA + ": " + portB, portB, ManagedObjectType.SnmpInterface, deviceANode);
             List<ModelObject> peers = Lists.newArrayList(portANode, portBNode);
-            return new ModelObject(location, location, ModelObjectType.LINK, peers);
+            return new ModelObject(location, location, ManagedObjectType.SnmpInterfaceLink, peers);
         }
         throw new IllegalArgumentException("Failed to parse: " + location);
     }
@@ -547,10 +547,10 @@ public class EventMapper {
             String ospfZ = m.group(4);
 
 
-            ModelObject deviceANode = new ModelObject(deviceA, deviceA, ModelObjectType.DEVICE);
-            ModelObject deviceZNode = new ModelObject(deviceZ, deviceZ, ModelObjectType.DEVICE);
+            ModelObject deviceANode = new ModelObject(deviceA, deviceA, ManagedObjectType.Node);
+            ModelObject deviceZNode = new ModelObject(deviceZ, deviceZ, ManagedObjectType.Node);
             List<ModelObject> peers = Lists.newArrayList(deviceANode, deviceZNode);
-            ModelObject linkNode = new ModelObject(location, location, ModelObjectType.OSPF_LINK, peers);
+            ModelObject linkNode = new ModelObject(location, location, ManagedObjectType.Node, peers);
             return linkNode;
         }
         throw new IllegalArgumentException("Failed to parse: " + location);
@@ -564,8 +564,8 @@ public class EventMapper {
             String device = m.group(1);
             String powerSupply = m.group(2);
 
-            ModelObject deviceNode = new ModelObject(device, device, ModelObjectType.DEVICE);
-            ModelObject powerSupplyNode = new ModelObject(location, powerSupply, ModelObjectType.POWER_SUPPLY, deviceNode);
+            ModelObject deviceNode = new ModelObject(device, device, ManagedObjectType.Node);
+            ModelObject powerSupplyNode = new ModelObject(location, powerSupply, ManagedObjectType.EntPhysicalEntity, deviceNode);
             return powerSupplyNode;
         }
         throw new IllegalArgumentException("Failed to parse: " + location);
@@ -580,9 +580,9 @@ public class EventMapper {
             String fanTray = m.group(2);
             String fan = m.group(3);
 
-            ModelObject deviceNode = new ModelObject(device, device, ModelObjectType.DEVICE);
-            ModelObject fanTrayNode = new ModelObject(device + "#" + fanTray + ".", fanTray, ModelObjectType.FAN_TRAY, deviceNode);
-            ModelObject fanNode = new ModelObject(location, fan, ModelObjectType.FAN, fanTrayNode);
+            ModelObject deviceNode = new ModelObject(device, device, ManagedObjectType.Node);
+            ModelObject fanTrayNode = new ModelObject(device + "#" + fanTray + ".", fanTray, ManagedObjectType.EntPhysicalEntity, deviceNode);
+            ModelObject fanNode = new ModelObject(location, fan, ManagedObjectType.EntPhysicalEntity, fanTrayNode);
             return fanNode;
         }
         throw new IllegalArgumentException("Failed to parse: " + location);
@@ -596,13 +596,12 @@ public class EventMapper {
             String device = m.group(1);
             String card = m.group(2);
 
-            ModelObject deviceNode = new ModelObject(device, device, ModelObjectType.DEVICE);
-            ModelObject cardNode = new ModelObject(location, card, ModelObjectType.CARD, deviceNode);
+            ModelObject deviceNode = new ModelObject(device, device, ManagedObjectType.Node);
+            ModelObject cardNode = new ModelObject(location, card, ManagedObjectType.Node, deviceNode);
             return cardNode;
         }
         throw new IllegalArgumentException("Failed to parse: " + location);
     }
-
 
     public static ModelObject createAggregationGroupObject(EventRecordLite e) {
         final String location = e.getLocation();
@@ -612,8 +611,8 @@ public class EventMapper {
             String device = m.group(1);
             String group = m.group(2);
 
-            ModelObject deviceNode = new ModelObject(device, device, ModelObjectType.DEVICE);
-            return new ModelObject(location, group, ModelObjectType.AGGREGATION_GROUP, deviceNode);
+            ModelObject deviceNode = new ModelObject(device, device, ManagedObjectType.Node);
+            return new ModelObject(location, group, ManagedObjectType.SnmpInterface, deviceNode);
         }
         throw new IllegalArgumentException("Failed to parse: " + location);
     }

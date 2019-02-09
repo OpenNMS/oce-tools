@@ -64,7 +64,7 @@ import com.google.common.io.Resources;
 public class HybridOnmsCpnOceGeneratorTest {
 
     @Test
-    public void canDoIt() {
+    public void canGenerateHybridModel() {
         // Mock all the data for ticket #4743230
         int ticketId = 4743230;
         StaticCpnDatasetViewer viewer = CpnTestDataUtils.loadDataForTicket(ticketId);

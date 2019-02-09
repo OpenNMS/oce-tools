@@ -43,6 +43,11 @@
             <version>${oce.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.opennms.oce.integrations.opennms</groupId>
+            <artifactId>model</artifactId>
+            <version>${oce.version}</version>
+        </dependency>
+        <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
         </dependency>

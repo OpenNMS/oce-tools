@@ -45,9 +45,9 @@ import org.opennms.oce.datasource.v1.schema.PeerDefRef;
 import org.opennms.oce.datasource.v1.schema.PeerRef;
 import org.opennms.oce.datasource.v1.schema.RelativeDefRef;
 import org.opennms.oce.datasource.v1.schema.RelativeRef;
+import org.opennms.oce.opennms.model.ManagedObjectType;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn2oce.model.ModelObject;
-import org.opennms.oce.tools.cpn2oce.model.ModelObjectType;
 
 public class ModelGenerator {
     public static final String MODEL_ROOT_TYPE = "Model";
@@ -90,18 +90,18 @@ public class ModelGenerator {
         rootModelDef.getParentDefRef().add(rootModelParentDefRef);
         modelObjectDefs.add(rootModelDef);
 
-        final Map<ModelObjectType, List<ModelObject>> allMosByType = allMos.stream()
+        final Map<ManagedObjectType, List<ModelObject>> allMosByType = allMos.stream()
                 .collect(groupingBy(ModelObject::getType));
 
         metaModel = new MetaModel();
-        for (Map.Entry<ModelObjectType, List<ModelObject>> entry : allMosByType.entrySet()) {
-            final ModelObjectType type = entry.getKey();
+        for (Map.Entry<ManagedObjectType, List<ModelObject>> entry : allMosByType.entrySet()) {
+            final ManagedObjectType type = entry.getKey();
             final ModelObjectDef def = new ModelObjectDef();
             def.setType(type.toString());
 
-            final Set<ModelObjectType> parentTypes = new LinkedHashSet<>();
-            final Set<ModelObjectType> peerTypes = new LinkedHashSet<>();
-            final Set<ModelObjectType> uncleTypes = new LinkedHashSet<>();
+            final Set<ManagedObjectType> parentTypes = new LinkedHashSet<>();
+            final Set<ManagedObjectType> peerTypes = new LinkedHashSet<>();
+            final Set<ManagedObjectType> uncleTypes = new LinkedHashSet<>();
             for (ModelObject mo : entry.getValue()) {
                 if (mo.hasParent()) {
                     parentTypes.add(mo.getParent().getType());
@@ -115,7 +115,7 @@ public class ModelGenerator {
             }
 
             if (parentTypes.size() > 0) {
-                for (ModelObjectType parentType : parentTypes) {
+                for (ManagedObjectType parentType : parentTypes) {
                     ParentDefRef parentDefRef = new ParentDefRef();
                     parentDefRef.setType(parentType.toString());
                     def.getParentDefRef().add(parentDefRef);
@@ -124,13 +124,13 @@ public class ModelGenerator {
                 def.getParentDefRef().add(rootModelParentDefRef);
             }
 
-            for (ModelObjectType peerType : peerTypes) {
+            for (ManagedObjectType peerType : peerTypes) {
                 PeerDefRef peerDefRef = new PeerDefRef();
                 peerDefRef.setType(peerType.toString());
                 def.getPeerDefRef().add(peerDefRef);
             }
 
-            for (ModelObjectType uncleType : uncleTypes) {
+            for (ManagedObjectType uncleType : uncleTypes) {
                 RelativeDefRef relativeDefRef = new RelativeDefRef();
                 relativeDefRef.setType(uncleType.toString());
                 def.getRelativeDefRef().add(relativeDefRef);
@@ -152,7 +152,7 @@ public class ModelGenerator {
         modelRootEntry.setParentId(MODEL_ROOT_ID);
         inventory.getModelObjectEntry().add(modelRootEntry);
 
-        for (Map.Entry<ModelObjectType, List<ModelObject>> mosByType : allMosByType.entrySet()) {
+        for (Map.Entry<ManagedObjectType, List<ModelObject>> mosByType : allMosByType.entrySet()) {
             for (ModelObject mo : mosByType.getValue()) {
                 ModelObjectEntry moe = new ModelObjectEntry();
 

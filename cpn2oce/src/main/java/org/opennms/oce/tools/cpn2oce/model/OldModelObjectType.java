@@ -32,7 +32,7 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-public enum ModelObjectType {
+public enum OldModelObjectType {
     DEVICE,
     PORT(DEVICE),
     CPU(DEVICE),
@@ -49,13 +49,13 @@ public enum ModelObjectType {
     CARD(DEVICE),
     EIGRP_NEIGHBOR(PORT);
 
-    private final Set<ModelObjectType> parentTypes;
+    private final Set<OldModelObjectType> parentTypes;
 
-    ModelObjectType(ModelObjectType... parentTypes) {
+    OldModelObjectType(OldModelObjectType... parentTypes) {
         this.parentTypes = new LinkedHashSet<>(Arrays.asList(parentTypes));
     }
 
-    public Set<ModelObjectType> getParentTypes() {
+    public Set<OldModelObjectType> getParentTypes() {
         return parentTypes;
     }
 

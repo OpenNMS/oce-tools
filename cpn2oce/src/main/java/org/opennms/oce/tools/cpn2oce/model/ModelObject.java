@@ -33,31 +33,33 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
+import org.opennms.oce.opennms.model.ManagedObjectType;
+
 public class ModelObject {
 
     private final String id;
     private final String specificId;
-    private final ModelObjectType type;
+    private final ManagedObjectType type;
     private final ModelObject parent;
     private final List<ModelObject> peers;
     private final List<ModelObject> nephews = new ArrayList<>();
     private final List<ModelObject> uncles = new ArrayList<>();
 
-    public ModelObject(String id, String specificId, ModelObjectType type) {
+    public ModelObject(String id, String specificId, ManagedObjectType type) {
         this(id, specificId, type, (ModelObject)null);
     }
 
-    public ModelObject(String id, String specificId, ModelObjectType type, ModelObject parent) {
+    public ModelObject(String id, String specificId, ManagedObjectType type, ModelObject parent) {
         this(id, specificId, type, parent, Collections.emptyList());
     }
 
-    public ModelObject(String id, String specificId, ModelObjectType type, List<ModelObject> peers) {
+    public ModelObject(String id, String specificId, ManagedObjectType type, List<ModelObject> peers) {
         this(id, specificId, type, null, peers);
     }
 
-    public ModelObject(String id, String specificId, ModelObjectType type, ModelObject parent, List<ModelObject> peers) {
+    public ModelObject(String id, String specificId, ManagedObjectType type, ModelObject parent, List<ModelObject> peers) {
         this.id = Objects.requireNonNull(id);
-        this.specificId = Objects.requireNonNull(specificId);
+        this.specificId =  specificId;
         this.type = Objects.requireNonNull(type);
         this.parent = parent;
         this.peers = Objects.requireNonNull(peers);
@@ -67,7 +69,7 @@ public class ModelObject {
         return id;
     }
 
-    public ModelObjectType getType() {
+    public ManagedObjectType getType() {
         return type;
     }
 

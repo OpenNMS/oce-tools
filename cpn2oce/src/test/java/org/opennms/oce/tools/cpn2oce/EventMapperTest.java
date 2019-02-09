@@ -38,12 +38,12 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.junit.Test;
+import org.opennms.oce.opennms.model.ManagedObjectType;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.view.CpnDatasetView;
 import org.opennms.oce.tools.cpn.view.StaticCpnDatasetViewer;
 import org.opennms.oce.tools.cpn2oce.model.EventDefinition;
 import org.opennms.oce.tools.cpn2oce.model.ModelObject;
-import org.opennms.oce.tools.cpn2oce.model.ModelObjectType;
 
 import com.google.common.collect.Sets;
 
@@ -62,8 +62,8 @@ public class EventMapperTest {
             EventDefinition def = getMachingEvenfDef(serviceEvent);
             assertThat("No match for: " + serviceEvent, def, notNullValue());
             ModelObject mo = def.getModelObjectTree(serviceEvent);
-            assertThat(mo.getType(), either(equalTo(ModelObjectType.PORT))
-                    .or(equalTo(ModelObjectType.EIGRP_NEIGHBOR)));
+            assertThat(mo.getType(), either(equalTo(ManagedObjectType.SnmpInterface))
+                    .or(equalTo(ManagedObjectType.Node)));
         }
     }
 
@@ -81,11 +81,11 @@ public class EventMapperTest {
             assertThat(def, notNullValue());
             ModelObject mo = def.getModelObjectTree(serviceEvent);
 
-            assertThat(mo.getType(), equalTo(ModelObjectType.LINK));
-            assertThat(mo.getPeers().get(0).getType(), equalTo(ModelObjectType.PORT));
-            assertThat(mo.getPeers().get(1).getType(), equalTo(ModelObjectType.PORT));
-            assertThat(mo.getPeers().get(0).getParent().getType(), equalTo(ModelObjectType.DEVICE));
-            assertThat(mo.getPeers().get(1).getParent().getType(), equalTo(ModelObjectType.DEVICE));
+            assertThat(mo.getType(), equalTo(ManagedObjectType.SnmpInterfaceLink));
+            assertThat(mo.getPeers().get(0).getType(), equalTo(ManagedObjectType.SnmpInterface));
+            assertThat(mo.getPeers().get(1).getType(), equalTo(ManagedObjectType.SnmpInterface));
+            assertThat(mo.getPeers().get(0).getParent().getType(), equalTo(ManagedObjectType.Node));
+            assertThat(mo.getPeers().get(1).getParent().getType(), equalTo(ManagedObjectType.Node));
         }
     }
 
@@ -103,9 +103,9 @@ public class EventMapperTest {
             assertThat(def, notNullValue());
             ModelObject mo = def.getModelObjectTree(trap);
 
-            assertThat(mo.getType(), equalTo(ModelObjectType.PORT));
+            assertThat(mo.getType(), equalTo(ManagedObjectType.SnmpInterface));
             ModelObject parent = mo.getParent();
-            assertThat(parent.getType(), equalTo(ModelObjectType.DEVICE));
+            assertThat(parent.getType(), equalTo(ManagedObjectType.Node));
         }
     }
 
