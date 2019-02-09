@@ -105,9 +105,7 @@ public class SituationsAlarmsAndEvents {
                     .filter(e -> e.getTimestamp().getTime() >= alarmLifespan.getStartMs() && e.getTimestamp().getTime() <= alarmLifespan.getEndMs())
                     .forEach(eventsInAlarm::add);
 
-            final OnmsAlarmSummary alarm = new OnmsAlarmSummary(entry.getKey(), reductionKey, alarmLifespan,
-                    firstAlarm.getLogMessage(), firstAlarm.getManagedObjectInstance(),
-                    firstAlarm.getManagedObjectType(), eventsInAlarm);
+            final OnmsAlarmSummary alarm = new OnmsAlarmSummary(alarmDocs, alarmLifespan, eventsInAlarm);
             alarmsById.put(alarm.getId(), alarm);
         }
 

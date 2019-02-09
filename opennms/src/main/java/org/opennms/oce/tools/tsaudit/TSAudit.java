@@ -28,30 +28,19 @@
 
 package org.opennms.oce.tools.tsaudit;
 
-import static java.util.stream.Collectors.groupingBy;
-import static org.elasticsearch.index.query.QueryBuilders.matchPhraseQuery;
 import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 
 import java.io.IOException;
 import java.io.StringWriter;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.OptionalDouble;
-import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import org.apache.commons.csv.CSVFormat;
@@ -59,12 +48,7 @@ import org.apache.commons.csv.CSVPrinter;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.opennms.oce.tools.NodeAndFactsGenerator;
 import org.opennms.oce.tools.cpn.ESDataProvider;
-import org.opennms.oce.tools.cpn.EventUtils;
 import org.opennms.oce.tools.cpn.events.MatchingSyslogEventRecord;
-import org.opennms.oce.tools.cpn.model.EventRecord;
-import org.opennms.oce.tools.cpn.model.TicketRecord;
-import org.opennms.oce.tools.cpn.model.TrapRecord;
-import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.onms.client.EventClient;
 import org.opennms.oce.tools.tsaudit.rest.RestServer;
@@ -110,8 +94,8 @@ public class TSAudit {
         nodeAndFactsGenerator = NodeAndFactsGenerator.newBuilder()
                 .setCpnEventExcludes(cpnEventExcludes)
                 .setEnd(this.end)
-                .setEsDataProvider(this.esDataProvider)
-                .setEventClient(this.eventClient)
+                .setCpnEntityDao(this.esDataProvider)
+                .setOnmsEntityDao(this.eventClient)
                 .setHostnameSubstringsToFilter(this.hostnameSubstringsToFilter)
                 .setStart(this.start)
                 .build();

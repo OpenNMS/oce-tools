@@ -531,9 +531,7 @@ public class TicketMatcher {
                 allEventsInSituation.addAll(eventsInAlarm);
 
                 // Build the alarm summary
-                final String logMessage = relatedAlarmDtos.iterator().next().getLogMessage();
-                String nodeLabel = nodeAndEvents.getNodeAndFacts().getOpennmsNodeLabel();
-                final OnmsAlarmSummary alarmSummary = new OnmsAlarmSummary(relatedAlarmId, relatedReductionKey, alarmLifespan, logMessage, nodeId.toString(), nodeLabel, eventsInAlarm);
+                final OnmsAlarmSummary alarmSummary = new OnmsAlarmSummary(relatedAlarmDtos, alarmLifespan, eventsInAlarm);
                 alarmSummaries.add(alarmSummary);
             }
 

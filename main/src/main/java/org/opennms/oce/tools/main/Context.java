@@ -30,17 +30,42 @@ package org.opennms.oce.tools.main;
 
 import java.util.Objects;
 
+import org.opennms.oce.tools.NodeAndFactsGenerator;
+import org.opennms.oce.tools.cpn.ESDataProvider;
+import org.opennms.oce.tools.cpn.api.CpnEntityDao;
 import org.opennms.oce.tools.es.ESClient;
+import org.opennms.oce.tools.onms.client.EventClient;
+import org.opennms.oce.tools.onms.client.api.OnmsEntityDao;
+import org.opennms.oce.tools.svc.DefaultNodeAndFactsService;
+import org.opennms.oce.tools.svc.NodeAndFactsService;
 
 public class Context {
 
     private final ESClient esClient;
+    private final OnmsEntityDao onmsEntityDao;
+    private final CpnEntityDao cpnEntityDao;
+    private final NodeAndFactsService nodeAndFactsService;
 
     public Context(ESClient esClient) {
         this.esClient = Objects.requireNonNull(esClient);
+        this.onmsEntityDao = new EventClient(esClient);
+        this.cpnEntityDao = new ESDataProvider(esClient);
+        this.nodeAndFactsService = new DefaultNodeAndFactsService(onmsEntityDao, cpnEntityDao);
     }
 
     public ESClient getEsClient() {
         return esClient;
+    }
+
+    public OnmsEntityDao getOnmsEntityDao() {
+        return onmsEntityDao;
+    }
+
+    public CpnEntityDao getCpnEntityDao() {
+        return cpnEntityDao;
+    }
+
+    public NodeAndFactsService getNodeAndFactsService() {
+        return nodeAndFactsService;
     }
 }

@@ -28,6 +28,7 @@
 
 package org.opennms.oce.tools.tsaudit;
 
+import java.time.ZonedDateTime;
 import java.util.Objects;
 
 public class NodeAndFacts {
@@ -47,6 +48,8 @@ public class NodeAndFacts {
     private Long numOpennmsTraps;
     private Long numCpnSyslogs;
     private Long numCpnTraps;
+    private ZonedDateTime start;
+    private ZonedDateTime end;
 
     public NodeAndFacts(String cpnHostname) {
         this.cpnHostname = Objects.requireNonNull(cpnHostname);
@@ -122,6 +125,23 @@ public class NodeAndFacts {
 
     public void setClockSkew(Long clockSkew) {
         this.clockSkew = clockSkew;
+    }
+
+
+    public ZonedDateTime getStart() {
+        return start;
+    }
+
+    public void setStart(ZonedDateTime start) {
+        this.start = start;
+    }
+
+    public ZonedDateTime getEnd() {
+        return end;
+    }
+
+    public void setEnd(ZonedDateTime end) {
+        this.end = end;
     }
 
     public boolean shouldProcess() {

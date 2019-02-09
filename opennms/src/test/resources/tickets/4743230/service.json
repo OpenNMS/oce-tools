@@ -1,0 +1,58 @@
+[
+  {
+    "source": "service",
+    "severity": "Cleared",
+    "eventId": "37245956390914_1546917136949",
+    "time": "2019-01-07T22:12:17-0500",
+    "description": "Port up",
+    "detailedDescription": "Port Up",
+    "location": "sw1: Ethernet113/1/12",
+    "alarmId": "4743230",
+    "ticketId": "4743230",
+    "causingEventId": "",
+    "duplicationCount": 1,
+    "reductionCount": 1
+  },
+  {
+    "source": "service",
+    "severity": "Major",
+    "eventId": "34634616274946_1546917025073",
+    "time": "2019-01-07T22:10:25-0500",
+    "description": "Port down due to oper",
+    "detailedDescription": "Port Down due to Oper Status down",
+    "location": "sw1: Ethernet113/1/12",
+    "alarmId": "4743230",
+    "ticketId": "4743230",
+    "causingEventId": "",
+    "duplicationCount": 1,
+    "reductionCount": 1
+  },
+  {
+    "source": "service",
+    "severity": "Cleared",
+    "eventId": "21358872363010_1546916467497",
+    "time": "2019-01-07T22:01:07-0500",
+    "description": "Port up",
+    "detailedDescription": "Port Up",
+    "location": "sw1: Ethernet113/1/12",
+    "alarmId": "4743230",
+    "ticketId": "4743230",
+    "causingEventId": "",
+    "duplicationCount": 1,
+    "reductionCount": 1
+  },
+  {
+    "source": "service",
+    "severity": "Major",
+    "eventId": "41953240547330_1546913602192",
+    "time": "2019-01-07T21:13:22-0500",
+    "description": "Port down due to oper",
+    "detailedDescription": "Port Down due to Oper Status down",
+    "location": "sw1: Ethernet113/1/12",
+    "alarmId": "4743230",
+    "ticketId": "4743230",
+    "causingEventId": "",
+    "duplicationCount": 1,
+    "reductionCount": 1
+  }
+]

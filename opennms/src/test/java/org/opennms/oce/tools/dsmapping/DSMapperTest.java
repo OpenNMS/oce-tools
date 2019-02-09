@@ -80,7 +80,7 @@ import org.opennms.oce.tools.tsaudit.NodeAndFacts;
 import org.opennms.oce.tools.tsaudit.OnmsAlarmSummary;
 import org.opennms.oce.tools.tsaudit.SituationAndEvents;
 
-public class DSMApperTest {
+public class DSMapperTest {
     private final NodeAndFactsGenerator mockNAF = mock(NodeAndFactsGenerator.class);
     private final NodeAndFactsGenerator.NodeAndFactsGeneratorBuilder mockNAFBuilder =
             mock(NodeAndFactsGenerator.NodeAndFactsGeneratorBuilder.class);
@@ -142,8 +142,8 @@ public class DSMApperTest {
         when(mockNAFBuilder.setCpnEventExcludes(any())).thenReturn(mockNAFBuilder);
         when(mockNAFBuilder.setStart(any())).thenReturn(mockNAFBuilder);
         when(mockNAFBuilder.setEnd(any())).thenReturn(mockNAFBuilder);
-        when(mockNAFBuilder.setEsDataProvider(any())).thenReturn(mockNAFBuilder);
-        when(mockNAFBuilder.setEventClient(any())).thenReturn(mockNAFBuilder);
+        when(mockNAFBuilder.setOnmsEntityDao(any())).thenReturn(mockNAFBuilder);
+        when(mockNAFBuilder.setCpnEntityDao(any())).thenReturn(mockNAFBuilder);
         when(mockNAFBuilder.setHostnameSubstringsToFilter(any())).thenReturn(mockNAFBuilder);
 
         List<NodeAndFacts> mockNodeAndFacts = getMockNodeAndFacts();

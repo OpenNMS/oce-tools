@@ -54,7 +54,13 @@ public class ESEventDTO {
 
     @SerializedName("logmsg")
     private String logMessage;
-    
+
+    @SerializedName("eventdescr")
+    private String eventdescr;
+
+    @SerializedName("eventsource")
+    private String eventsource;
+
     @SerializedName("p_oids")
     private List<Map<String, String>> p_oids;
 
@@ -180,6 +186,22 @@ public class ESEventDTO {
 
     public void setSeverity(Integer severity) {
         this.severity = severity;
+    }
+
+    public String getEventdescr() {
+        return eventdescr;
+    }
+
+    public void setEventdescr(String eventdescr) {
+        this.eventdescr = eventdescr;
+    }
+
+    public String getEventsource() {
+        return eventsource;
+    }
+
+    public void setEventsource(String eventsource) {
+        this.eventsource = eventsource;
     }
 
     @Override

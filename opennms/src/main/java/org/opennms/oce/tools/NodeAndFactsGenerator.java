@@ -52,14 +52,14 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import org.elasticsearch.index.query.QueryBuilder;
-import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.cpn.EventUtils;
+import org.opennms.oce.tools.cpn.api.CpnEntityDao;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.TicketRecord;
 import org.opennms.oce.tools.cpn.model.TrapRecord;
 import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
-import org.opennms.oce.tools.onms.client.EventClient;
+import org.opennms.oce.tools.onms.client.api.OnmsEntityDao;
 import org.opennms.oce.tools.tsaudit.EventMatcher;
 import org.opennms.oce.tools.tsaudit.GenericSyslogMessage;
 import org.opennms.oce.tools.tsaudit.Lifespan;
@@ -75,9 +75,9 @@ import org.slf4j.LoggerFactory;
 
 public class NodeAndFactsGenerator {
     private static final Logger LOG = LoggerFactory.getLogger(NodeAndFactsGenerator.class);
-    
-    private final ESDataProvider esDataProvider;
-    private final EventClient eventClient;
+
+    private final OnmsEntityDao onmsEntityDao;
+    private final CpnEntityDao cpnEntityDao;
     private final ZonedDateTime start;
     private final ZonedDateTime end;
     private final List<String> hostnameSubstringsToFilter;
@@ -87,11 +87,11 @@ public class NodeAndFactsGenerator {
     private final long startMs;
     private final long endMs;
 
-    private NodeAndFactsGenerator(ESDataProvider esDataProvider, EventClient eventClient, ZonedDateTime start,
+    private NodeAndFactsGenerator(OnmsEntityDao onmsEntityDao, CpnEntityDao cpnEntityDao, ZonedDateTime start,
                                  ZonedDateTime end, List<String> hostnameSubstringsToFilter,
                                  List<QueryBuilder> cpnEventExcludes) {
-        this.esDataProvider = Objects.requireNonNull(esDataProvider);
-        this.eventClient = Objects.requireNonNull(eventClient);
+        this.onmsEntityDao = Objects.requireNonNull(onmsEntityDao);
+        this.cpnEntityDao = Objects.requireNonNull(cpnEntityDao);
         this.start = Objects.requireNonNull(start);
         this.end = Objects.requireNonNull(end);
         this.hostnameSubstringsToFilter = Objects.requireNonNull(hostnameSubstringsToFilter);
@@ -103,8 +103,8 @@ public class NodeAndFactsGenerator {
     }
 
     public static class NodeAndFactsGeneratorBuilder {
-        private ESDataProvider esDataProvider;
-        private EventClient eventClient;
+        private OnmsEntityDao onmsEntityDao;
+        private CpnEntityDao cpnEntityDao;
         private ZonedDateTime start;
         private ZonedDateTime end;
         private List<String> hostnameSubstringsToFilter = Collections.emptyList();
@@ -113,13 +113,13 @@ public class NodeAndFactsGenerator {
         private NodeAndFactsGeneratorBuilder() {
         }
 
-        public NodeAndFactsGeneratorBuilder setEsDataProvider(ESDataProvider esDataProvider) {
-            this.esDataProvider = esDataProvider;
+        public NodeAndFactsGeneratorBuilder setOnmsEntityDao(OnmsEntityDao onmsEntityDao) {
+            this.onmsEntityDao = onmsEntityDao;
             return this;
         }
 
-        public NodeAndFactsGeneratorBuilder setEventClient(EventClient eventClient) {
-            this.eventClient = eventClient;
+        public NodeAndFactsGeneratorBuilder setCpnEntityDao(CpnEntityDao cpnEntityDao) {
+            this.cpnEntityDao = cpnEntityDao;
             return this;
         }
 
@@ -144,7 +144,7 @@ public class NodeAndFactsGenerator {
         }
 
         public NodeAndFactsGenerator build() {
-            return new NodeAndFactsGenerator(esDataProvider, eventClient, start, end, hostnameSubstringsToFilter, cpnEventExcludes);
+            return new NodeAndFactsGenerator(onmsEntityDao, cpnEntityDao, start, end, hostnameSubstringsToFilter, cpnEventExcludes);
         }
     }
 
@@ -156,7 +156,7 @@ public class NodeAndFactsGenerator {
         // Build the unique set of hostnames by scrolling through all locations and extracting
         // the hostname portion
         final Set<String> hostnames = new LinkedHashSet<>();
-        esDataProvider.getDistinctLocations(start, end, cpnEventExcludes, locations -> {
+        cpnEntityDao.getDistinctLocations(start, end, cpnEventExcludes, locations -> {
             for (String location : locations) {
                 hostnames.add(EventUtils.getNodeLabelFromLocation(location));
             }
@@ -165,7 +165,7 @@ public class NodeAndFactsGenerator {
         return getNodesAndFacts(hostnames);
     }
 
-    public List<NodeAndFacts> getNodesAndFacts(Set<String> hostnames) throws IOException {
+    public List<NodeAndFacts> getNodesAndFacts(Set<String> hostnames) {
         final List<NodeAndFacts> nodesAndFacts = new LinkedList<>();
         // Build the initial objects from the set of hostname
         for (String hostname : hostnames) {
@@ -187,6 +187,10 @@ public class NodeAndFactsGenerator {
         }
 
         for (NodeAndFacts nodeAndFacts : nodesAndFacts) {
+            // Store the current start/end range in the fact
+            nodeAndFacts.setStart(start);
+            nodeAndFacts.setEnd(end);
+
             // Now try and find *some* event for where the node label starts with the given hostname
             findOpennmsNodeInfo(nodeAndFacts);
 
@@ -196,12 +200,12 @@ public class NodeAndFactsGenerator {
             }
 
             // Count the number of syslogs and traps received in CPN
-            nodeAndFacts.setNumCpnSyslogs(esDataProvider.getNumSyslogEvents(start, end, nodeAndFacts.getCpnHostname(), cpnEventExcludes));
-            nodeAndFacts.setNumCpnTraps(esDataProvider.getNumTrapEvents(start, end, nodeAndFacts.getCpnHostname(), cpnEventExcludes));
+            nodeAndFacts.setNumCpnSyslogs(cpnEntityDao.getNumSyslogEvents(start, end, nodeAndFacts.getCpnHostname(), cpnEventExcludes));
+            nodeAndFacts.setNumCpnTraps(cpnEntityDao.getNumTrapEvents(start, end, nodeAndFacts.getCpnHostname(), cpnEventExcludes));
 
             // Count the number of syslogs and traps received in OpenNMS
-            nodeAndFacts.setNumOpennmsSyslogs(eventClient.getNumSyslogEvents(startMs, endMs, nodeAndFacts.getOpennmsNodeId()));
-            nodeAndFacts.setNumOpennmsTraps(eventClient.getNumTrapEvents(startMs, endMs, nodeAndFacts.getOpennmsNodeId()));
+            nodeAndFacts.setNumOpennmsSyslogs(onmsEntityDao.getNumSyslogEvents(startMs, endMs, nodeAndFacts.getOpennmsNodeId()));
+            nodeAndFacts.setNumOpennmsTraps(onmsEntityDao.getNumTrapEvents(startMs, endMs, nodeAndFacts.getOpennmsNodeId()));
 
             // Detect clock skew if we have 1+ syslog messages from both CPN and OpenNMS
             if (nodeAndFacts.getNumCpnSyslogs() > 0 && nodeAndFacts.getNumOpennmsSyslogs() > 0) {
@@ -218,14 +222,14 @@ public class NodeAndFactsGenerator {
         return nodesAndFacts;
     }
 
-    private void findOpennmsNodeInfo(NodeAndFacts nodeAndFacts) throws IOException {
+    private void findOpennmsNodeInfo(NodeAndFacts nodeAndFacts) {
         LOG.debug("Trying to find OpenNMS node info for hostname: {}", nodeAndFacts.getCpnHostname());
         if (stateCache.findOpennmsNodeInfo(nodeAndFacts)) {
             LOG.debug("Results successfully loaded from cache.");
             return;
         }
 
-        final Optional<ESEventDTO> firstEvent = eventClient.findFirstEventForNodeLabelPrefix(startMs, endMs,
+        final Optional<ESEventDTO> firstEvent = onmsEntityDao.findFirstEventForNodeLabelPrefix(startMs, endMs,
                 nodeAndFacts.getCpnHostname());
         if (firstEvent.isPresent()) {
             final ESEventDTO event = firstEvent.get();
@@ -239,14 +243,14 @@ public class NodeAndFactsGenerator {
         stateCache.saveOpennmsNodeInfo(nodeAndFacts);
     }
 
-    private void detectClockSkewUsingSyslogEvents(NodeAndFacts nodeAndFacts) throws IOException {
+    private void detectClockSkewUsingSyslogEvents(NodeAndFacts nodeAndFacts) {
         LOG.debug("Detecting clock skew for hostname: {}", nodeAndFacts.getCpnHostname());
         final List<Long> deltas = new LinkedList<>();
         final AtomicReference<Date> minTimeRef = new AtomicReference<>(new Date());
         final AtomicReference<Date> maxTimeRef = new AtomicReference<>(new Date(0));
 
         // Retrieve syslog records for the given host
-        esDataProvider.getSyslogRecordsInRange(start, end, Arrays.asList(matchPhraseQuery("location", nodeAndFacts.getCpnHostname())), cpnEventExcludes,  syslogs -> {
+        cpnEntityDao.getSyslogRecordsInRange(start, end, Arrays.asList(matchPhraseQuery("location", nodeAndFacts.getCpnHostname())), cpnEventExcludes,  syslogs -> {
             for (EventRecord syslog : syslogs) {
                 // Skip clears
                 if (EventUtils.isClear(syslog)) {
@@ -299,7 +303,7 @@ public class NodeAndFactsGenerator {
         LOG.debug("Clock skew results for hostname: {}, status: {}, skew: {}", nodeAndFacts.getCpnHostname(), clockSkewStatus, clockSkew);
     }
 
-    public NodeAndEvents retrieveAndPairEvents(NodeAndFacts nodeAndFacts) throws IOException {
+    public NodeAndEvents retrieveAndPairEvents(NodeAndFacts nodeAndFacts) {
         final List<EventRecord> cpnSyslogEvents = new ArrayList<>();
         final List<TrapRecord> cpnTrapEvents = new ArrayList<>();
         final List<ESEventDTO> onmsTrapEvents = new ArrayList<>();
@@ -307,7 +311,7 @@ public class NodeAndFactsGenerator {
 
         // Retrieve syslog records for the given host
         LOG.debug("Retrieving CPN syslog records for: {}", nodeAndFacts.getCpnHostname());
-        esDataProvider.getSyslogRecordsInRange(start, end, Arrays.asList(matchPhraseQuery("location", nodeAndFacts.getCpnHostname())), cpnEventExcludes,  syslogs -> {
+        cpnEntityDao.getSyslogRecordsInRange(start, end, Arrays.asList(matchPhraseQuery("location", nodeAndFacts.getCpnHostname())), cpnEventExcludes,  syslogs -> {
             for (EventRecord syslog : syslogs) {
                 // Skip clears
                 if (EventUtils.isClear(syslog)) {
@@ -319,7 +323,7 @@ public class NodeAndFactsGenerator {
 
         // Retrieve trap records for the given host
         LOG.debug("Retrieving CPN trap records for: {}", nodeAndFacts.getCpnHostname());
-        esDataProvider.getTrapRecordsInRange(start, end, Arrays.asList(matchPhraseQuery("location", nodeAndFacts.getCpnHostname())), cpnEventExcludes,  traps -> {
+        cpnEntityDao.getTrapRecordsInRange(start, end, Arrays.asList(matchPhraseQuery("location", nodeAndFacts.getCpnHostname())), cpnEventExcludes,  traps -> {
             for (TrapRecord trap : traps) {
                 // Skip clears
                 if (EventUtils.isClear(trap)) {
@@ -331,11 +335,11 @@ public class NodeAndFactsGenerator {
 
         // Retrieve the ONMS trap events
         LOG.debug("Retrieving ONMS trap events for: {}", nodeAndFacts.getOpennmsNodeLabel());
-        onmsTrapEvents.addAll(eventClient.getTrapEvents(startMs, endMs, Arrays.asList(termQuery("nodeid", nodeAndFacts.getOpennmsNodeId()))));
+        onmsTrapEvents.addAll(onmsEntityDao.getTrapEvents(startMs, endMs, Arrays.asList(termQuery("nodeid", nodeAndFacts.getOpennmsNodeId()))));
 
         // Retrieve the ONMS syslog events
         LOG.debug("Retrieving ONMS syslog events for: {}", nodeAndFacts.getOpennmsNodeLabel());
-        onmsSyslogEvents.addAll(eventClient.getSyslogEvents(startMs, endMs, Arrays.asList(termQuery("nodeid", nodeAndFacts.getOpennmsNodeId()))));
+        onmsSyslogEvents.addAll(onmsEntityDao.getSyslogEvents(startMs, endMs, Arrays.asList(termQuery("nodeid", nodeAndFacts.getOpennmsNodeId()))));
         LOG.debug("Done retrieving events for host. Found {} CPN syslogs, {} CPN traps, {} ONMS syslogs and {} ONMS traps.",
                 cpnSyslogEvents.size(), cpnTrapEvents.size(), onmsSyslogEvents.size(), onmsTrapEvents.size());
 
@@ -354,7 +358,7 @@ public class NodeAndFactsGenerator {
     public List<TicketAndEvents> getTicketsAndPairEvents(NodeAndEvents nodeAndEvents) throws IOException {
         // Retrieve the tickets
         final List<TicketRecord> ticketsOnNode = new LinkedList<>();
-        esDataProvider.getTicketRecordsInRange(start, end,
+        cpnEntityDao.getTicketRecordsInRange(start, end,
                 Arrays.asList(
                         matchPhraseQuery("location", nodeAndEvents.getNodeAndFacts().getCpnHostname()), // must be for the node in question
                         termQuery("affectedDevicesCount", 1) // must only affect a single device (this node)
@@ -385,11 +389,11 @@ public class NodeAndFactsGenerator {
         return getSituationsAlarmsAndEvents(nodeAndEvents).getSituationsAndEvents();
     }
 
-    public SituationsAlarmsAndEvents getSituationsAlarmsAndEvents(NodeAndEvents nodeAndEvents) throws IOException {
+    public SituationsAlarmsAndEvents getSituationsAlarmsAndEvents(NodeAndEvents nodeAndEvents) {
         // Retrieve the situations and alarms
         final int nodeId = nodeAndEvents.getNodeAndFacts().getOpennmsNodeId();
-        final List<AlarmDocumentDTO> allSituationDtos = eventClient.getSituationsOnNodeId(startMs, endMs, nodeId);
-        final List<AlarmDocumentDTO> alarmDtos = eventClient.getAlarmsOnNodeId(startMs, endMs, nodeId);
+        final List<AlarmDocumentDTO> allSituationDtos = onmsEntityDao.getSituationsOnNodeId(startMs, endMs, nodeId);
+        final List<AlarmDocumentDTO> alarmDtos = onmsEntityDao.getAlarmsOnNodeId(startMs, endMs, nodeId);
 
         // Group the situations by id
         final Map<Integer, List<AlarmDocumentDTO>> situationsById = allSituationDtos.stream()
@@ -456,11 +460,7 @@ public class NodeAndFactsGenerator {
 
                 allEventsInSituation.addAll(eventsInAlarm);
 
-                // Build the alarm summary
-                final String logMessage = relatedAlarmDtos.iterator().next().getLogMessage();
-                String moInstance = relatedAlarmDtos.iterator().next().getManagedObjectInstance();
-                String moType = relatedAlarmDtos.iterator().next().getManagedObjectType();
-                final OnmsAlarmSummary alarmSummary = new OnmsAlarmSummary(relatedAlarmId, relatedReductionKey, alarmLifespan, logMessage, moInstance, moType, eventsInAlarm);
+                final OnmsAlarmSummary alarmSummary = new OnmsAlarmSummary(relatedAlarmDtos, alarmLifespan, eventsInAlarm);
                 alarmSummaries.add(alarmSummary);
             }
 

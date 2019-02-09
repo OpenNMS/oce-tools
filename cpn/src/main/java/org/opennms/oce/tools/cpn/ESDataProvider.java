@@ -49,6 +49,7 @@ import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.opennms.oce.tools.cpn.api.CpnEntityDao;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.TicketRecord;
 import org.opennms.oce.tools.cpn.model.TrapRecord;
@@ -65,7 +66,7 @@ import io.searchbox.core.search.aggregation.TermsAggregation;
 import io.searchbox.core.search.sort.Sort;
 import io.searchbox.params.Parameters;
 
-public class ESDataProvider {
+public class ESDataProvider implements CpnEntityDao {
 
     public static final int BATCH_SIZE = 10000;
 
@@ -89,7 +90,8 @@ public class ESDataProvider {
         getTicketRecordsInRange(startTime, endTime, Collections.emptyList(), Collections.emptyList(), callback);
     }
 
-    public void getTicketRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, List<QueryBuilder> includeQueries, List<QueryBuilder> excludeQueries, Consumer<List<TicketRecord>> callback) throws IOException {
+    @Override
+    public void getTicketRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, List<QueryBuilder> includeQueries, List<QueryBuilder> excludeQueries, Consumer<List<TicketRecord>> callback) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         final BoolQueryBuilder boolQuery = new BoolQueryBuilder();
         final RangeQueryBuilder rangeQueryBuilder = new RangeQueryBuilder("rootEventTime")
@@ -110,7 +112,7 @@ public class ESDataProvider {
         getTicketRecords(searchSourceBuilder.toString(), callback);
     }
 
-    private void getTicketRecords(String query, Consumer<List<TicketRecord>> callback) throws IOException {
+    private void getTicketRecords(String query, Consumer<List<TicketRecord>> callback) {
         final Search search = new Search.Builder(query)
                 .addIndex("tickets")
                 .addType("ticket")
@@ -186,7 +188,8 @@ public class ESDataProvider {
         getTrapRecordsInRange(startTime, endTime, Collections.emptyList(), Collections.emptyList(), callback);
     }
 
-    public void getTrapRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, List<QueryBuilder> includeQueries, List<QueryBuilder> excludeQueries, Consumer<List<TrapRecord>> callback) throws IOException {
+    @Override
+    public void getTrapRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, List<QueryBuilder> includeQueries, List<QueryBuilder> excludeQueries, Consumer<List<TrapRecord>> callback) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         final BoolQueryBuilder boolQuery = new BoolQueryBuilder();
         boolQuery.mustNot(QueryBuilders.matchQuery("ticketId", ""));
@@ -209,7 +212,7 @@ public class ESDataProvider {
         getTrapRecords(searchSourceBuilder.toString(), callback);
     }
 
-    private void getTrapRecords(String query, Consumer<List<TrapRecord>> callback) throws IOException {
+    private void getTrapRecords(String query, Consumer<List<TrapRecord>> callback) {
         final Search search = new Search.Builder(query)
                 .addIndex("traps")
                 .addType("trap")
@@ -262,7 +265,8 @@ public class ESDataProvider {
         getSyslogRecordsInRange(startTime, endTime, callback);
     }
 
-    public void getSyslogRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, List<QueryBuilder> includeQueries, List<QueryBuilder> excludeQueries, Consumer<List<EventRecord>> callback, QueryBuilder... queries) throws IOException {
+    @Override
+    public void getSyslogRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, List<QueryBuilder> includeQueries, List<QueryBuilder> excludeQueries, Consumer<List<EventRecord>> callback, QueryBuilder... queries)  {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         final BoolQueryBuilder boolQuery = new BoolQueryBuilder();
         boolQuery.mustNot(QueryBuilders.matchQuery("ticketId", ""));
@@ -287,7 +291,7 @@ public class ESDataProvider {
         getSyslogRecords(searchSourceBuilder.toString(), callback);
     }
 
-    private void getSyslogRecords(String query, Consumer<List<EventRecord>> callback) throws IOException {
+    private void getSyslogRecords(String query, Consumer<List<EventRecord>> callback) {
         final Search search = new Search.Builder(query)
                 .addIndex("syslogs")
                 .addType("syslog")
@@ -305,15 +309,17 @@ public class ESDataProvider {
         return allEventsInTicket;
     }
 
-    public long getNumSyslogEvents(ZonedDateTime startTime, ZonedDateTime endTime, String hostname, List<QueryBuilder> excludeQueries) throws IOException {
+    @Override
+    public long getNumSyslogEvents(ZonedDateTime startTime, ZonedDateTime endTime, String hostname, List<QueryBuilder> excludeQueries) {
         return getNumEventsForHostname(startTime, endTime, hostname, excludeQueries, "syslogs", "syslog");
     }
 
-    public long getNumTrapEvents(ZonedDateTime startTime, ZonedDateTime endTime, String hostname, List<QueryBuilder> excludeQueries) throws IOException {
+    @Override
+    public long getNumTrapEvents(ZonedDateTime startTime, ZonedDateTime endTime, String hostname, List<QueryBuilder> excludeQueries) {
         return getNumEventsForHostname(startTime, endTime, hostname, excludeQueries, "traps", "trap");
     }
 
-    public long getNumEventsForHostname(ZonedDateTime startTime, ZonedDateTime endTime, String hostname, List<QueryBuilder> excludeQueries, String index, String type) throws IOException {
+    public long getNumEventsForHostname(ZonedDateTime startTime, ZonedDateTime endTime, String hostname, List<QueryBuilder> excludeQueries, String index, String type) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.size(0); // we don't need the results, only the count
         final BoolQueryBuilder boolQuery = QueryBuilders.boolQuery()
@@ -328,14 +334,20 @@ public class ESDataProvider {
                 .addIndex(index)
                 .addType(type)
                 .build();
-        SearchResult result = esClient.getJestClient().execute(search);
+        SearchResult result = null;
+        try {
+            result = esClient.getJestClient().execute(search);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         if (!result.isSucceeded()) {
             throw new RuntimeException(result.getErrorMessage());
         }
         return result.getTotal();
     }
 
-    public void getDistinctLocations(ZonedDateTime startTime, ZonedDateTime endTime, List<QueryBuilder> excludeQueries, Consumer<List<String>> callback) throws IOException {
+    @Override
+    public void getDistinctLocations(ZonedDateTime startTime, ZonedDateTime endTime, List<QueryBuilder> excludeQueries, Consumer<List<String>> callback) {
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         final BoolQueryBuilder boolQuery = new BoolQueryBuilder();
@@ -363,7 +375,12 @@ public class ESDataProvider {
                 .addIndex("syslogs")
                 .addType("syslog")
                 .build();
-        SearchResult result = esClient.getJestClient().execute(search);
+        SearchResult result = null;
+        try {
+            result = esClient.getJestClient().execute(search);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         if (!result.isSucceeded()) {
             throw new RuntimeException(result.getErrorMessage());
         }
@@ -376,7 +393,11 @@ public class ESDataProvider {
                 .addIndex("traps")
                 .addType("trap")
                 .build();
-        result = esClient.getJestClient().execute(search);
+        try {
+            result = esClient.getJestClient().execute(search);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         if (!result.isSucceeded()) {
             throw new RuntimeException(result.getErrorMessage());
         }
@@ -385,29 +406,33 @@ public class ESDataProvider {
         callback.accept(locations);
     }
 
-    private <T> void scroll(Search search, Class<T> clazz, Consumer<List<T>> callback) throws IOException {
-        JestResult result = esClient.getJestClient().execute(search);
-        while(true) {
-            if (!result.isSucceeded()) {
-                throw new RuntimeException(result.getErrorMessage());
+    private <T> void scroll(Search search, Class<T> clazz, Consumer<List<T>> callback) {
+        try {
+            JestResult result = esClient.getJestClient().execute(search);
+            while(true) {
+                if (!result.isSucceeded()) {
+                    throw new RuntimeException(result.getErrorMessage());
+                }
+
+                // Cast the result to a search result for easy access to the hits
+                SearchResult searchResult = new SearchResult(new Gson());
+                searchResult.setJsonObject(result.getJsonObject());
+                searchResult.setPathToResult(result.getPathToResult());
+                List<SearchResult.Hit<T, Void>> hits = searchResult.getHits(clazz);
+                if (hits.size() < 1) {
+                    break;
+                }
+
+                // Issue the callback
+                callback.accept(hits.stream().map(h -> h.source).collect(Collectors.toList()));
+
+                // Scroll
+                String scrollId = result.getJsonObject().getAsJsonPrimitive("_scroll_id").getAsString();
+                SearchScroll scroll = new SearchScroll.Builder(scrollId, "5m").build();
+                result = esClient.getJestClient().execute(scroll);
             }
-
-            // Cast the result to a search result for easy access to the hits
-            SearchResult searchResult = new SearchResult(new Gson());
-            searchResult.setJsonObject(result.getJsonObject());
-            searchResult.setPathToResult(result.getPathToResult());
-            List<SearchResult.Hit<T, Void>> hits = searchResult.getHits(clazz);
-            if (hits.size() < 1) {
-                break;
-            }
-
-            // Issue the callback
-            callback.accept(hits.stream().map(h -> h.source).collect(Collectors.toList()));
-
-            // Scroll
-            String scrollId = result.getJsonObject().getAsJsonPrimitive("_scroll_id").getAsString();
-            SearchScroll scroll = new SearchScroll.Builder(scrollId, "5m").build();
-            result = esClient.getJestClient().execute(scroll);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 

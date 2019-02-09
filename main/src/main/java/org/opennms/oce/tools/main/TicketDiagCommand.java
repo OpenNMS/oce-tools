@@ -28,24 +28,31 @@
 
 package org.opennms.oce.tools.main;
 
-import java.io.IOException;
-
 import org.kohsuke.args4j.Option;
-import org.opennms.oce.tools.ticketdiag.TicketDiag;
+import org.opennms.oce.tools.cpn.model.TicketRecord;
+import org.opennms.oce.tools.cpn.view.CpnDatasetView;
+import org.opennms.oce.tools.cpn.view.CpnDatasetViewer;
+import org.opennms.oce.tools.cpn.view.ESBackedCpnDatasetViewer;
+import org.opennms.oce.tools.ticketdiag.TicketDetails;
+import org.opennms.oce.tools.ticketdiag.TicketDiagnostic;
 
 public class TicketDiagCommand extends AbstractCommand {
     public static final String NAME = "ticketdiag";
 
     @Option(name = "--ticket-id", aliases = {"-t"}, usage = "Ticket ID", required=true)
-    private Long ticketId;
+    private String ticketId;
 
     public TicketDiagCommand() {
         super(NAME);
     }
 
     @Override
-    public void doExec(Context context) throws IOException {
-        final TicketDiag diag = new TicketDiag(context.getEsClient(), ticketId);
-        diag.doDiag();
+    public void doExec(Context context) {
+        final CpnDatasetView view = new CpnDatasetView.Builder().build();
+        final CpnDatasetViewer viewer = new ESBackedCpnDatasetViewer(context.getEsClient(), view);
+        final TicketRecord ticket = viewer.getTicketWithId(ticketId);
+        final TicketDiagnostic diag = new TicketDiagnostic(ticket, viewer, context.getNodeAndFactsService());
+        final TicketDetails ticketDetails = diag.getTicketDetails();
+        ticketDetails.prettyPrint();
     }
 }

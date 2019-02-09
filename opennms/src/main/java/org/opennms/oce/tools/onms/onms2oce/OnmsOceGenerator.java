@@ -52,9 +52,9 @@ import org.opennms.oce.datasource.v1.schema.Severity;
 import org.opennms.oce.datasource.v1.schema.Situation;
 import org.opennms.oce.datasource.v1.schema.Situations;
 import org.opennms.oce.tools.NodeAndFactsGenerator;
-import org.opennms.oce.tools.cpn.ESDataProvider;
+import org.opennms.oce.tools.cpn.api.CpnEntityDao;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
-import org.opennms.oce.tools.onms.client.EventClient;
+import org.opennms.oce.tools.onms.client.api.OnmsEntityDao;
 import org.opennms.oce.tools.tsaudit.NodeAndEvents;
 import org.opennms.oce.tools.tsaudit.NodeAndFacts;
 import org.opennms.oce.tools.tsaudit.OnmsAlarmSummary;
@@ -84,21 +84,21 @@ public class OnmsOceGenerator  {
 
     private ZonedDateTime start;
     private ZonedDateTime end;
-    private EventClient eventClient;
-    private ESDataProvider esDataProvider;
+    private OnmsEntityDao onmsEntityDao;
+    private CpnEntityDao cpnEntityDao;
 
     private OnmsOceGenerator(Builder builder) {
         this.modelGenerationDisabled = builder.modelGenerationDisabled;
         this.targetFolder = builder.targetFolder;
-        this.esDataProvider = builder.esDataProvider;
-        this.eventClient = builder.eventClient;
+        this.onmsEntityDao = builder.onmsEntityDao;
+        this.cpnEntityDao = builder.cpnEntityDao;
         this.start = builder.start;
         this.end = builder.end;
 
         nodeAndFactsGenerator = NodeAndFactsGenerator.newBuilder()
                 .setEnd(this.end)
-                .setEsDataProvider(this.esDataProvider)
-                .setEventClient(this.eventClient)
+                .setOnmsEntityDao(onmsEntityDao)
+                .setCpnEntityDao(cpnEntityDao)
                 .setHostnameSubstringsToFilter(Collections.emptyList())
                 .setStart(this.start)
                 .build();
@@ -107,20 +107,21 @@ public class OnmsOceGenerator  {
     public static class Builder {
         private boolean modelGenerationDisabled = false;
         private File targetFolder;
-        private ESDataProvider esDataProvider;
-        private EventClient eventClient;
+        private OnmsEntityDao onmsEntityDao;
+        private CpnEntityDao cpnEntityDao;
         private ZonedDateTime start;
         private ZonedDateTime end;
         public Builder withModelGenerationDisabled(boolean modelGenerationDisabled) {
             this.modelGenerationDisabled = modelGenerationDisabled;
             return this;
         }
-        public Builder withDataProvider(ESDataProvider esDataProvider) {
-            this.esDataProvider = esDataProvider;
+        public Builder withOnmsEntityDao(OnmsEntityDao onmsEntityDao) {
+            this.onmsEntityDao = onmsEntityDao;
             return this;
         }
-        public Builder withClient(EventClient eventClient) {
-            this.eventClient = eventClient;
+
+        public Builder withCpnEntityDao(CpnEntityDao cpnEntityDao) {
+            this.cpnEntityDao = cpnEntityDao;
             return this;
         }
         public Builder withTargetFolder(File targetFolder) {

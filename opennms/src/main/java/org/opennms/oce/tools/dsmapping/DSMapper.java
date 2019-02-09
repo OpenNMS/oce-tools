@@ -180,8 +180,8 @@ public class DSMapper {
                 .setCpnEventExcludes(TSAudit.cpnEventExcludes)
                 .setStart(start)
                 .setEnd(end)
-                .setEsDataProvider(esDataProvider)
-                .setEventClient(eventClient)
+                .setCpnEntityDao(esDataProvider)
+                .setOnmsEntityDao(eventClient)
                 .build();
         Map<String, NodeAndEvents> nodeToNodeAndEvents = getNodeAndEvents(nodeAndFactsGenerator);
         Map<String, List<SituationAndEvents>> nodeToSituationAndEvents = getSituationAndEvents(nodeAndFactsGenerator,

@@ -59,6 +59,7 @@ import org.elasticsearch.search.sort.SortOrder;
 import org.opennms.oce.tools.es.ESClient;
 import org.opennms.oce.tools.es.ESClusterConfiguration;
 import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
+import org.opennms.oce.tools.onms.client.api.OnmsEntityDao;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -71,7 +72,7 @@ import io.searchbox.core.SearchScroll;
 import io.searchbox.core.search.sort.Sort;
 import io.searchbox.params.Parameters;
 
-public class EventClient {
+public class EventClient implements OnmsEntityDao {
     public static final int BATCH_SIZE = 100;
 
     private final ESClusterConfiguration esClusterConfiguration;
@@ -156,7 +157,8 @@ public class EventClient {
         ));
     }
 
-    public List<ESEventDTO> getTrapEvents(long startMs, long endMs, List<QueryBuilder> includeQueries) throws IOException {
+    @Override
+    public List<ESEventDTO> getTrapEvents(long startMs, long endMs, List<QueryBuilder> includeQueries) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         BoolQueryBuilder boolQuery = boolQuery()
                 .must(nestedQuery("p_oids", boolQuery().must(existsQuery("p_oids")), ScoreMode.None))
@@ -192,7 +194,8 @@ public class EventClient {
                 .collect(Collectors.toList());
     }
 
-    public List<ESEventDTO> getSyslogEvents(long startMs, long endMs, List<QueryBuilder> includeQueries) throws IOException {
+    @Override
+    public List<ESEventDTO> getSyslogEvents(long startMs, long endMs, List<QueryBuilder> includeQueries) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         final BoolQueryBuilder boolQuery = new BoolQueryBuilder();
         boolQuery.must(matchQuery("eventsource", "syslogd"));
@@ -213,7 +216,8 @@ public class EventClient {
         return matchedEvents;
     }
 
-    public Optional<ESEventDTO> findFirstEventForNodeLabelPrefix(long startMs, long endMs, String nodeLabelPrefix) throws IOException {
+    @Override
+    public Optional<ESEventDTO> findFirstEventForNodeLabelPrefix(long startMs, long endMs, String nodeLabelPrefix) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.sort("@timestamp", SortOrder.ASC);
         searchSourceBuilder.size(1); // limit to 1
@@ -231,7 +235,8 @@ public class EventClient {
         return matchedEvents.stream().findFirst();
     }
 
-    public List<AlarmDocumentDTO> getSituationsOnNodeId(long startMs, long endMs, int nodeId) throws IOException {
+    @Override
+    public List<AlarmDocumentDTO> getSituationsOnNodeId(long startMs, long endMs, int nodeId) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.boolQuery()
                 .must(termQuery("situation", "true"))
@@ -286,7 +291,8 @@ public class EventClient {
         scroll(search, ESEventDTO.class, callback);
     }
 
-    public List<AlarmDocumentDTO> getAlarmsOnNodeId(long startMs, long endMs, int nodeId) throws IOException {
+    @Override
+    public List<AlarmDocumentDTO> getAlarmsOnNodeId(long startMs, long endMs, int nodeId) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.boolQuery()
                 //.must(termQuery("part_of_situation", "true"))
@@ -302,15 +308,17 @@ public class EventClient {
         return situations;
     }
 
-    public long getNumSyslogEvents(long startMs, long endMs, int nodeId) throws IOException {
+    @Override
+    public long getNumSyslogEvents(long startMs, long endMs, int nodeId) {
         return getNumEventsForMatching(startMs, endMs, nodeId, termQuery("eventsource", "syslogd"));
     }
 
-    public long getNumTrapEvents(long startMs, long endMs, int nodeId) throws IOException {
+    @Override
+    public long getNumTrapEvents(long startMs, long endMs, int nodeId) {
         return getNumEventsForMatching(startMs, endMs, nodeId, nestedQuery("p_oids", boolQuery().must(existsQuery("p_oids")), ScoreMode.None));
     }
 
-    public long getNumEventsForMatching(long startMs, long endMs, int nodeId, QueryBuilder queryBuilder) throws IOException {
+    public long getNumEventsForMatching(long startMs, long endMs, int nodeId, QueryBuilder queryBuilder) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.sort("@timestamp", SortOrder.ASC);
         searchSourceBuilder.size(0); // we don't need the results, only the count
@@ -323,43 +331,54 @@ public class EventClient {
                 .addSort(new Sort("@timestamp"))
                 .build();
 
-        SearchResult result = client.execute(search);
+        SearchResult result = null;
+        try {
+            result = client.execute(search);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         if (!result.isSucceeded()) {
             throw new RuntimeException(result.getErrorMessage());
         }
         return result.getTotal();
     }
 
-    private <T> void scroll(Search search, Class<T> clazz, Consumer<List<T>> callback) throws IOException {
-        JestResult result = client.execute(search);
-        while(true) {
-            if (!result.isSucceeded()) {
-                throw new RuntimeException(result.getErrorMessage());
+    private <T> void scroll(Search search, Class<T> clazz, Consumer<List<T>> callback) {
+        try {
+            JestResult result = client.execute(search);
+            while(true) {
+                if (!result.isSucceeded()) {
+                    throw new RuntimeException(result.getErrorMessage());
+                }
+
+                Gson gson = new GsonBuilder()
+                        .registerTypeAdapter(Date.class, new DateTimeTypeConverter()).create();
+
+                // Cast the result to a search result for easy access to the hits
+                SearchResult searchResult = new SearchResult(gson);
+                searchResult.setJsonObject(result.getJsonObject());
+                searchResult.setPathToResult(result.getPathToResult());
+                List<SearchResult.Hit<T, Void>> hits = searchResult.getHits(clazz);
+                if (hits.size() < 1) {
+                    break;
+                }
+
+                // Issue the callback
+                callback.accept(hits.stream().map(h -> h.source).collect(Collectors.toList()));
+
+                // Scroll
+                if (!result.getJsonObject().has("_scroll_id")) {
+                    return;
+                }
+                String scrollId = result.getJsonObject().getAsJsonPrimitive("_scroll_id").getAsString();
+                SearchScroll scroll = new SearchScroll.Builder(scrollId, "5m").build();
+                result = client.execute(scroll);
             }
-
-            Gson gson = new GsonBuilder()
-                    .registerTypeAdapter(Date.class, new DateTimeTypeConverter()).create();
-
-            // Cast the result to a search result for easy access to the hits
-            SearchResult searchResult = new SearchResult(gson);
-            searchResult.setJsonObject(result.getJsonObject());
-            searchResult.setPathToResult(result.getPathToResult());
-            List<SearchResult.Hit<T, Void>> hits = searchResult.getHits(clazz);
-            if (hits.size() < 1) {
-                break;
-            }
-
-            // Issue the callback
-            callback.accept(hits.stream().map(h -> h.source).collect(Collectors.toList()));
-
-            // Scroll
-            if (!result.getJsonObject().has("_scroll_id")) {
-                return;
-            }
-            String scrollId = result.getJsonObject().getAsJsonPrimitive("_scroll_id").getAsString();
-            SearchScroll scroll = new SearchScroll.Builder(scrollId, "5m").build();
-            result = client.execute(scroll);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
+
     }
 
 }

@@ -64,7 +64,8 @@ public class OceTools {
             OnmsExportCommand.NAME,
             TSAuditCommand.NAME,
             DSMapCommand.NAME,
-            TicketDiagCommand.NAME
+            TicketDiagCommand.NAME,
+            HybridOnmsCpnOceExportCommand.NAME
     );
 
     @Option(name = "--es-config", usage = "elasticsearch configuration", metaVar = "es-yaml-config")
@@ -88,6 +89,7 @@ public class OceTools {
             @SubCommand(name=TSAuditCommand.NAME, impl=TSAuditCommand.class),
             @SubCommand(name=DSMapCommand.NAME, impl=DSMapCommand.class),
             @SubCommand(name=TicketDiagCommand.NAME, impl=TicketDiagCommand.class),
+            @SubCommand(name=HybridOnmsCpnOceExportCommand.NAME, impl=HybridOnmsCpnOceExportCommand.class)
     })
     private Command cmd;
 

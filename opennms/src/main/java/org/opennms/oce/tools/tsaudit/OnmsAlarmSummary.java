@@ -29,7 +29,12 @@
 package org.opennms.oce.tools.tsaudit;
 
 import java.util.List;
+import java.util.Objects;
 
+import org.opennms.oce.datasource.v1.schema.Alarm;
+import org.opennms.oce.datasource.v1.schema.Event;
+import org.opennms.oce.datasource.v1.schema.Severity;
+import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 
 public class OnmsAlarmSummary {
@@ -37,18 +42,22 @@ public class OnmsAlarmSummary {
     private final String reductionKey;
     private final Lifespan lifespan;
     private final String logMessage;
+    private final String description;
     private final String managedObjectInstance;
     private final String managedObjectType;
     private final List<ESEventDTO> events;
-    
-    public OnmsAlarmSummary(int id, String reductionKey, Lifespan lifespan, String logMessage, String managedObjectInstance, String managedObjectType, List<ESEventDTO> events) {
-        this.id = id;
-        this.reductionKey = reductionKey;
-        this.lifespan = lifespan;
-        this.logMessage = logMessage;
-        this.managedObjectInstance = managedObjectInstance;
-        this.managedObjectType = managedObjectType;
-        this.events = events;
+
+    public OnmsAlarmSummary(final List<AlarmDocumentDTO> alarmStates, Lifespan alarmLifespan, List<ESEventDTO> events) {
+        this.lifespan = Objects.requireNonNull(alarmLifespan);
+        this.events = Objects.requireNonNull(events);
+
+        final AlarmDocumentDTO firstAlarm = alarmStates.iterator().next();
+        this.id = firstAlarm.getId();
+        this.reductionKey = firstAlarm.getReductionKey();
+        this.logMessage = firstAlarm.getLogMessage();
+        this.description = firstAlarm.getDescription();
+        this.managedObjectType = firstAlarm.getManagedObjectType();
+        this.managedObjectInstance = firstAlarm.getManagedObjectInstance();
     }
 
     public int getId() {
@@ -77,5 +86,52 @@ public class OnmsAlarmSummary {
 
     public List<ESEventDTO> getEvents() {
         return events;
+    }
+
+    public Alarm toAlarm() {
+        final Alarm alarm = new Alarm();
+        alarm.setId(Integer.toString(id));
+        alarm.setSummary(logMessage);
+        alarm.setDescription(description);
+        alarm.setFirstEventTime(lifespan.getStartMs());
+        alarm.setLastEventTime(lifespan.getEndMs());
+
+        for (ESEventDTO e : events) {
+            final Event event = new Event();
+            event.setId(Integer.toString(e.getId()));
+            event.setSummary(e.getLogMessage());
+            event.setDescription(e.getEventdescr());
+            event.setSeverity(toSeverity(e.getSeverity()));
+            event.setSource(e.getEventsource());
+            event.setTime(e.getTimestamp().getTime());
+            alarm.getEvent().add(event);
+
+            if (alarm.getInventoryObjectType() == null && alarm.getInventoryObjectId() == null) {
+                alarm.setInventoryObjectType(alarm.getInventoryObjectType());
+                alarm.setInventoryObjectId(alarm.getInventoryObjectId());
+            }
+        }
+
+        alarm.setLastSeverity(alarm.getEvent().get(alarm.getEvent().size() - 1).getSeverity());
+        return alarm;
+    }
+
+    private static Severity toSeverity(Integer severity) {
+        switch(severity) {
+            case 7:
+                return Severity.CRITICAL;
+            case 6:
+                return Severity.MAJOR;
+            case 5:
+                return Severity.MINOR;
+            case 4:
+                return Severity.WARNING;
+            case 3:
+                return Severity.NORMAL;
+            case 2:
+                return Severity.CLEARED;
+            default:
+                return Severity.INDETERMINATE;
+        }
     }
 }

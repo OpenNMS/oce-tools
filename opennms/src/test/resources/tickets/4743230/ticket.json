@@ -1,0 +1,15 @@
+[{
+    "severity": "Cleared",
+    "ticketId": "4743230",
+    "lastModificationTime": "2019-01-07T22:39:11-0500",
+    "rootEventTime": "2019-01-07T21:13:22-0500",
+    "description": "Port up",
+    "location": "sw1: Ethernet113/1/12",
+    "acknowledged": true,
+    "creationTime": "2019-01-07T21:13:43-0500",
+    "eventCount": 14,
+    "affectedDevicesCount": "1",
+    "duplicationCount": "4",
+    "reductionCount": "14",
+    "alarmCount": "3"
+  }]
