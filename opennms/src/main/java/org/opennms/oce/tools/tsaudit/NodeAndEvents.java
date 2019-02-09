@@ -28,11 +28,13 @@
 
 package org.opennms.oce.tools.tsaudit;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.TrapRecord;
@@ -109,6 +111,20 @@ public class NodeAndEvents {
         matchedEvents.putAll(matchedSyslogs);
         matchedEvents.putAll(matchedTraps);
         return matchedEvents;
+    }
+
+    public List<EventRecord> getUnmatchedCpnEvents() {
+        final Map<String, Integer> matchedEvents = getMatchedEvents();
+        return getCpnEvents().stream()
+                .filter(e -> !matchedEvents.containsKey(e.getEventId()))
+                .collect(Collectors.toList());
+    }
+
+    public List<ESEventDTO> getUnmatchedOnmsEvents() {
+        final Map<String, Integer> matchedEvents = getMatchedEvents();
+        return getOnmsEvents().stream()
+                .filter(e -> !matchedEvents.containsValue(e.getId()))
+                .collect(Collectors.toList());
     }
 
     @Override

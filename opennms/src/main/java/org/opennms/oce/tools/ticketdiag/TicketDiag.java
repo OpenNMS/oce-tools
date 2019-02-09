@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -106,16 +107,16 @@ public class TicketDiag {
 
         // Build the node and fact generator using the ticket timerange
         final ZonedDateTime minEventTime = eventsInTicket.stream().min(Comparator.comparing(EventRecord::getTime))
-                .map(EventRecord::getTime).get()
+                .map(EventRecord::getTime).orElseThrow(() -> new IllegalStateException("No events found in ticket: " + ticketRecord.getTicketId()))
                 .toInstant().atZone(ZoneId.systemDefault());
         final ZonedDateTime maxEventTime = eventsInTicket.stream().max(Comparator.comparing(EventRecord::getTime))
-                .map(EventRecord::getTime).get()
+                .map(EventRecord::getTime).orElseThrow(() -> new IllegalStateException("No events found in ticket: " + ticketRecord.getTicketId()))
                 .toInstant().atZone(ZoneId.systemDefault());
         NodeAndFactsGenerator nodeAndFactsGenerator = NodeAndFactsGenerator.newBuilder()
                 .setEsDataProvider(esDataProvider)
                 .setEventClient(new EventClient(esClient))
-                .setStart(minEventTime)
-                .setEnd(maxEventTime)
+                .setStart(minEventTime.minusMinutes(5))
+                .setEnd(maxEventTime.plusMinutes(5))
                 .build();
 
         // Gather the facts for the given hostnames
@@ -139,6 +140,10 @@ public class TicketDiag {
         final Map<Integer, Integer> onmsEventIdToSituationId = new LinkedHashMap<>();
         final Map<Integer, SituationAndEvents> situationsById = new LinkedHashMap<>();
 
+        // Unmatched
+        final List<EventRecord> unmatchedCpnEvents = new LinkedList<>();
+        final List<ESEventDTO> unmatchedOnmsEvents = new LinkedList<>();
+
         for (NodeAndFacts nodeAndFact : nodesAndFacts) {
             final NodeAndEvents nodeAndEvents = nodeAndFactsGenerator.retrieveAndPairEvents(nodeAndFact);
             for (Map.Entry<String, Integer> cpnEventIdToOnmsEventId : nodeAndEvents.getMatchedEvents().entrySet()) {
@@ -152,13 +157,35 @@ public class TicketDiag {
                     onmsEventIdToSituationId.put(esEventDTO.getId(), situationAndEvents.getId());
                 }
             }
+
+            unmatchedCpnEvents.addAll(nodeAndEvents.getUnmatchedCpnEvents());
+            unmatchedOnmsEvents.addAll(nodeAndEvents.getUnmatchedOnmsEvents());
         }
+
+
+        // Let's look at the events that were not matched
+        if (!unmatchedCpnEvents.isEmpty()) {
+            System.out.println("\n\nUnmatched events:");
+            unmatchedCpnEvents.sort(Comparator.comparing(EventRecord::getTime));
+            unmatchedOnmsEvents.sort(Comparator.comparing(ESEventDTO::getTimestamp));
+            for (EventRecord e : unmatchedCpnEvents) {
+                System.out.println(e);
+            }
+            for (ESEventDTO e : unmatchedOnmsEvents) {
+                System.out.println(e);
+            }
+            System.out.println("\n\n");
+        }
+
 
         for (EventRecord e : eventsInTicket) {
             Integer onmsEventId = cpnEventIdToOnmsEventIds.get(e.getEventId());
             Integer situationId = onmsEventId != null ? onmsEventIdToSituationId.get(onmsEventId) : null;
             System.out.printf("CPN Event: %s (%s - %s) -> OpenNMS Event ID: %s -> OpenNMS Situation ID: %s\n",
                     e.getEventId(), e.getSource(), e.getTime(), onmsEventId, situationId);
+            if (onmsEventId == null) {
+                System.out.printf("\t%s\n", e);
+            }
         }
     }
 }

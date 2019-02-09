@@ -39,19 +39,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
-import org.junit.Before;
 import org.junit.Test;
 import org.opennms.oce.tools.cpn.events.MatchingSyslogEventRecord;
 import org.opennms.oce.tools.cpn.events.MatchingTrapEventRecord;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 
+import com.google.common.collect.Lists;
+
 public class EventMatcherTest {
 
-    @Before
-    public void clean() {
-        EventMatcher.alreadyMatchedOnmsEvents.clear();
-    }
-    
     @Test
     public void canMatchLinkDownTraps() {
         List<MatchingTrapEventRecord> cpnTraps = new ArrayList<>();
@@ -215,7 +211,52 @@ public class EventMatcherTest {
         assertThat(results.values(), hasSize(1));
     }
 
-    private void setTrapTypeOid(ESEventDTO event, String trapTypeOid) {
+    private static MatchingTrapEventRecord createCpnLinkUpTrap(int id, long timestamp, String ifDescr) {
+        String host = "testhost";
+        String location = String.format("%s: %s", host, ifDescr);
+        String trapType = ".1.3.6.1.6.3.1.1.5.4";
+        return new ImplMatchingTrapEventRecord(Integer.toString(id), location, new Date(timestamp), trapType);
+    }
+
+    private static ESEventDTO createOnmsLinkUpTrap(int id, long timestamp, String ifDescr) {
+        String trapType = ".1.3.6.1.6.3.1.1.5.4";
+        ESEventDTO event = new ESEventDTO();
+        event.setId(id);
+        event.setTimestamp(new Date(timestamp));
+        setTrapTypeOid(event, trapType);
+        setIfDescrOid(event, 1, ifDescr);
+        return event;
+    }
+
+    @Test
+    public void canMatchTrapsWithDrift() {
+        // In this data set CPN#1 is actually closest to OpenNMS#3 in time, but we expect it to be matched with OpenNMS#1 instead
+        List<MatchingTrapEventRecord> cpnTraps = Lists.newArrayList(
+                createCpnLinkUpTrap(1, 1546916457000L, "Ethernet113/1/12"), // Mon Jan 07 22:00:57 EST 2019
+                createCpnLinkUpTrap(2, 1546916487000L, "Ethernet114/1/13"), // Mon Jan 07 22:01:27 EST 2019
+                createCpnLinkUpTrap(3, 1546916568000L, "Ethernet113/1/12"), // Mon Jan 07 22:02:48 EST 2019
+                createCpnLinkUpTrap(4, 1546917124000L, "Ethernet114/1/13"), // Mon Jan 07 22:12:04 EST 2019
+                createCpnLinkUpTrap(5, 1546917127000L, "Ethernet113/1/12")  // Mon Jan 07 22:12:07 EST 2019
+        );
+
+        List<ESEventDTO> onmsTraps = Lists.newArrayList(
+                createOnmsLinkUpTrap(1, 1546916400336L, "Ethernet113/1/12"), // Mon Jan 07 22:00:00 EST 2019
+                createOnmsLinkUpTrap(2, 1546916429755L, "Ethernet114/1/13"), // Mon Jan 07 22:00:29 EST 2019
+                createOnmsLinkUpTrap(3, 1546916511177L, "Ethernet113/1/12"), // Mon Jan 07 22:01:51 EST 2019
+                createOnmsLinkUpTrap(4, 1546917021392L, "Ethernet114/1/13"), // Mon Jan 07 22:10:21 EST 2019
+                createOnmsLinkUpTrap(5, 1546917024391L, "Ethernet113/1/12")  // Mon Jan 07 22:10:24 EST 2019
+        );
+
+        Map<String, Integer> matchedTraps = EventMatcher.matchTrapEventsScopedByTimeAndHost(cpnTraps, onmsTraps);
+        // We should have matched them all
+        assertThat(matchedTraps.keySet(), hasSize(cpnTraps.size()));
+        for (Map.Entry<String,Integer> e : matchedTraps.entrySet()) {
+            // The expected IDs are the same, so expect the keys to match the values
+            assertThat(e.getKey(), equalTo(e.getValue().toString()));
+        }
+    }
+
+    private static void setTrapTypeOid(ESEventDTO event, String trapTypeOid) {
         if (event.getP_oids() != null) {
             event.getP_oids().clear();
         }
@@ -229,7 +270,7 @@ public class EventMatcherTest {
         event.setP_oids(p_oids);
     }
 
-    private void setIfDescrOid(ESEventDTO event, int ifIndex, String ifDescr) {
+    private static void setIfDescrOid(ESEventDTO event, int ifIndex, String ifDescr) {
         List<Map<String, String>> p_oids = event.getP_oids();
         Map<String, String> ifDescrVb = new HashMap<>();
         ifDescrVb.put("oid", ".1.3.6.1.2.1.2.2.1.2." + ifIndex);

@@ -29,10 +29,12 @@
 package org.opennms.oce.tools.tsaudit;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.LongSummaryStatistics;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -41,6 +43,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import org.apache.commons.math3.stat.descriptive.moment.Mean;
+import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
 import org.opennms.oce.tools.cpn.EventUtils;
 import org.opennms.oce.tools.cpn.events.MatchingSyslogEventRecord;
 import org.opennms.oce.tools.cpn.events.MatchingTrapEventRecord;
@@ -59,10 +63,13 @@ public class EventMatcher {
     private static final long timeDeltaAllowedMs = TimeUnit.MILLISECONDS.convert(120, TimeUnit.SECONDS);
     @VisibleForTesting
     static final long syslogDateFuzzMs = TimeUnit.MILLISECONDS.convert(1, TimeUnit.SECONDS);
-    @VisibleForTesting
-    static final Set<Integer> alreadyMatchedOnmsEvents = new HashSet<>();
+
+    private static final Mean mean = new Mean();
+    private static final StandardDeviation standardDeviation = new StandardDeviation(false);
+
 
     public static Map<String, Integer> matchSyslogEventsScopedByTimeAndHost(List<? extends MatchingSyslogEventRecord> cpnSyslogs, List<ESEventDTO> onmsSyslogs) {
+        final Set<Integer> alreadyMatchedOnmsEvents = new HashSet<>();
         // Group the syslogs by node
         List<GenericSyslogMessage> genericCpnSyslogs = mapSyslogMessagesFromCpn(cpnSyslogs);
         List<GenericSyslogMessage> genericOnmsSyslogs = mapSyslogMessagesFromOnms(onmsSyslogs);
@@ -123,8 +130,72 @@ public class EventMatcher {
         return potentialMatches;
     }
 
+    /**
+     * Matches traps from CPN/OpenNMS with the notion that they may not occur at the same time.
+     *
+     * This function attempts to match the traps based on their time and type.
+     *
+     * Time wise, we attempt to find a corresponding trap that closest in time, while minimizing the standard
+     * deviation of these differences.
+     *
+     * @param cpnTraps traps from CPN to match
+     * @param onmsTraps traps from OpenNMS to match
+     * @return map of CPN events id, to OpenNMS event id
+     */
     public static Map<String, Integer> matchTrapEventsScopedByTimeAndHost(List<? extends MatchingTrapEventRecord> cpnTraps,
                                                                           List<ESEventDTO> onmsTraps) {
+        // Index the traps by id for quick lookup
+        final Map<String, MatchingTrapEventRecord> cpnTrapsById = cpnTraps.stream()
+                .collect(Collectors.toMap(MatchingTrapEventRecord::getEventId, e -> e));
+        final Map<Integer, ESEventDTO> onmsTrapsById = onmsTraps.stream()
+                .collect(Collectors.toMap(ESEventDTO::getId, e -> e));
+
+        int maxIterations = 10; // limit the number of iterations - we shouldn't hit this, but just to be safe
+        double targetSigma = TimeUnit.SECONDS.toMillis(5); // acceptable value of sigma
+        double sigma;
+        long mu = 0;
+        long lastMu;
+        int iteration = 1;
+        boolean didMatchAllTraps;
+
+        Map<String, Integer> cpnEventIdToOnmsEventId;
+        do {
+            // Match the traps, correcting the timestamps by the average delta
+            cpnEventIdToOnmsEventId = matchTrapEventsScopedByTimeAndHost(cpnTraps, onmsTraps, mu);
+
+            // Compute the difference in time between the matches
+            final double[] deltas = cpnEventIdToOnmsEventId.entrySet().stream()
+                    .mapToDouble(e -> {
+                        final long cpnTrapTime = cpnTrapsById.get(e.getKey()).getTime().getTime();
+                        final long onmsTrapTime = onmsTrapsById.get(e.getValue()).getTimestamp().getTime();
+                        return (double)(onmsTrapTime - cpnTrapTime);
+                    }).toArray();
+
+            // Compute the mean and standard deviation of the deltas
+            lastMu = mu;
+            mu = (long)Math.floor(mean.evaluate(deltas));
+            sigma = standardDeviation.evaluate(deltas);
+
+            didMatchAllTraps = cpnTraps.size() - cpnEventIdToOnmsEventId.keySet().size() == 0;
+            /* DEBUG
+            System.out.printf("Iteration: %d\n", iteration);
+            System.out.printf("Deltas: %s\n", Arrays.toString(deltas));
+            System.out.printf("Mu: %d (previously at %d)\n", mu, lastMu);
+            System.out.printf("Sigma: %.2f\n", sigma);
+            System.out.printf("All matched?: %s\n", didMatchAllTraps);
+            */
+
+            iteration++;
+        } while (iteration <= maxIterations // while we haven't reached the iteration limit
+                && (!didMatchAllTraps || sigma > targetSigma) // while we haven't matched all of the traps AND reached our target sigma
+                && mu != lastMu); // while we're still adjusting the mean
+
+        return Collections.unmodifiableMap(cpnEventIdToOnmsEventId);
+    }
+
+    private static Map<String, Integer> matchTrapEventsScopedByTimeAndHost(List<? extends MatchingTrapEventRecord> cpnTraps,
+                                                                          List<ESEventDTO> onmsTraps, long drift) {
+        final Set<Integer> alreadyMatchedOnmsEvents = new HashSet<>();
         // Group the traps by node and sort them by time
         Map<String, List<MatchingTrapEventRecord>> cpnTrapsByType = groupCpnTrapsByType(cpnTraps);
         Map<String, List<ESEventDTO>> onmsTrapsByType = groupOnmsTrapsByType(onmsTraps);
@@ -147,7 +218,7 @@ public class EventMatcher {
                     List<ESEventDTO> refinedPotentialMatches = filterMatchesForTrap(cpnTrap, potentialMatches);
 
                     // Find the closest matching event (by time delta) within the allowed time range
-                    timeWindowSearch(cpnTrap.getTime().getTime(), refinedPotentialMatches)
+                    timeWindowSearch(cpnTrap.getTime().getTime(), refinedPotentialMatches, drift)
                             .ifPresent(id -> {
                                 cpnEventIdToOnmsEventId.put(cpnTrap.getEventId(), id);
                                 alreadyMatchedOnmsEvents.add(id);
@@ -155,7 +226,6 @@ public class EventMatcher {
                 }
             }
         }
-
         return Collections.unmodifiableMap(cpnEventIdToOnmsEventId);
     }
 
@@ -233,12 +303,12 @@ public class EventMatcher {
         return onmsTrapsByType;
     }
 
-    private static Optional<Integer> timeWindowSearch(long timestamp, List<ESEventDTO> traps) {
+    private static Optional<Integer> timeWindowSearch(long timestamp, List<ESEventDTO> traps, long drift) {
         long previousDelta = Long.MAX_VALUE;
         Optional<Integer> match = Optional.empty();
 
         for (ESEventDTO trap : traps) {
-            long trapTime = trap.getTimestamp().getTime();
+            long trapTime = trap.getTimestamp().getTime() - drift;
 
             if (trapTime > (timestamp + timeDeltaAllowedMs)) {
                 // We've gone past the window, time to stop looking
