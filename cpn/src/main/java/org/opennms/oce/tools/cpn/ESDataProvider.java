@@ -76,13 +76,23 @@ public class ESDataProvider implements CpnEntityDao {
         this.esClient = Objects.requireNonNull(esClient);
     }
 
-    public TicketRecord getTicketRecord(int id) throws IOException {
+    @Override
+    public TicketRecord getTicketRecord(String id) {
+        return getTicketRecord(Long.valueOf(id));
+    }
+
+    public TicketRecord getTicketRecord(int id) {
         return getTicketRecord(Integer.valueOf(id).longValue());
     }
 
-    public TicketRecord getTicketRecord(long id) throws IOException {
+    public TicketRecord getTicketRecord(long id) {
         Get get = new Get.Builder("tickets", Long.toString(id)).type("ticket").build();
-        JestResult result = esClient.getJestClient().execute(get);
+        JestResult result = null;
+        try {
+            result = esClient.getJestClient().execute(get);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         return result.getSourceAsObject(TicketRecord.class);
     }
 
@@ -122,7 +132,8 @@ public class ESDataProvider implements CpnEntityDao {
         scroll(search, TicketRecord.class, callback);
     }
 
-    public List<TrapRecord> getTrapsInTicket(String id) throws IOException {
+    @Override
+    public List<TrapRecord> getTrapsInTicket(String id) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.boolQuery().must(termQuery("ticketId",id)));
         String query = searchSourceBuilder.toString();
@@ -137,7 +148,8 @@ public class ESDataProvider implements CpnEntityDao {
         return traps;
     }
 
-    public List<EventRecord> getSyslogsInTicket(String id) throws IOException {
+    @Override
+    public List<EventRecord> getSyslogsInTicket(String id) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.boolQuery().must(termQuery("ticketId",id)));
         String query = searchSourceBuilder.toString();
@@ -152,7 +164,8 @@ public class ESDataProvider implements CpnEntityDao {
         return syslogs;
     }
 
-    public List<EventRecord> getServiceEventsInTicket(String id) throws IOException {
+    @Override
+    public List<EventRecord> getServiceEventsInTicket(String id) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.boolQuery().must(termQuery("ticketId",id)));
         String query = searchSourceBuilder.toString();

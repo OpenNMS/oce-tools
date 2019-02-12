@@ -45,10 +45,13 @@ public class OnmsAlarmSummary {
     private final String description;
     private final String managedObjectInstance;
     private final String managedObjectType;
+
+    private final List<AlarmDocumentDTO> alarmStates;
     private final List<ESEventDTO> events;
 
     public OnmsAlarmSummary(final List<AlarmDocumentDTO> alarmStates, Lifespan alarmLifespan, List<ESEventDTO> events) {
         this.lifespan = Objects.requireNonNull(alarmLifespan);
+        this.alarmStates = Objects.requireNonNull(alarmStates);
         this.events = Objects.requireNonNull(events);
 
         final AlarmDocumentDTO firstAlarm = alarmStates.iterator().next();
@@ -95,7 +98,10 @@ public class OnmsAlarmSummary {
         alarm.setDescription(description);
         alarm.setFirstEventTime(lifespan.getStartMs());
         alarm.setLastEventTime(lifespan.getEndMs());
+        alarm.setInventoryObjectType(managedObjectType);
+        alarm.setInventoryObjectId(managedObjectInstance);
 
+        Event lastEvent = null;
         for (ESEventDTO e : events) {
             final Event event = new Event();
             event.setId(Integer.toString(e.getId()));
@@ -105,14 +111,12 @@ public class OnmsAlarmSummary {
             event.setSource(e.getEventsource());
             event.setTime(e.getTimestamp().getTime());
             alarm.getEvent().add(event);
-
-            if (alarm.getInventoryObjectType() == null && alarm.getInventoryObjectId() == null) {
-                alarm.setInventoryObjectType(alarm.getInventoryObjectType());
-                alarm.setInventoryObjectId(alarm.getInventoryObjectId());
-            }
+            lastEvent = event;
         }
 
-        alarm.setLastSeverity(alarm.getEvent().get(alarm.getEvent().size() - 1).getSeverity());
+        if (lastEvent != null) {
+            alarm.setLastSeverity(lastEvent.getSeverity());
+        }
         return alarm;
     }
 
@@ -133,5 +137,9 @@ public class OnmsAlarmSummary {
             default:
                 return Severity.INDETERMINATE;
         }
+    }
+
+    public List<AlarmDocumentDTO> getAlarmStates() {
+        return alarmStates;
     }
 }

@@ -28,7 +28,6 @@
 
 package org.opennms.oce.tools.cpn.api;
 
-import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.function.Consumer;
@@ -39,6 +38,12 @@ import org.opennms.oce.tools.cpn.model.TicketRecord;
 import org.opennms.oce.tools.cpn.model.TrapRecord;
 
 public interface CpnEntityDao {
+
+    // Simple entity access
+    TicketRecord getTicketRecord(String ticketId);
+    List<TrapRecord> getTrapsInTicket(String ticketId);
+    List<EventRecord> getSyslogsInTicket(String ticketId);
+    List<EventRecord> getServiceEventsInTicket(String ticketId);
 
     void getDistinctLocations(ZonedDateTime startTime, ZonedDateTime endTime, List<QueryBuilder> excludeQueries, Consumer<List<String>> callback);
 

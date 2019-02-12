@@ -35,6 +35,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.opennms.oce.tools.cpn.model.EventRecord;
+import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.tsaudit.OnmsAlarmSummary;
 import org.opennms.oce.tools.tsaudit.SituationAndEvents;
 
@@ -43,6 +44,7 @@ import com.google.common.collect.Lists;
 public class TicketDetails {
     private final boolean didMatchAllEvents;
     private final List<EventRecord> cpnEventsInTicket;
+    private final List<ESEventDTO> onmsEvents;
     private final Map<String, Integer> cpnEventIdToOnmsEventIds;
     private final Map<Integer, Integer> onmsEventIdToAlarmId;
     private final Map<Integer, Integer> alarmIdToSituationId;
@@ -50,12 +52,14 @@ public class TicketDetails {
     private final Map<Integer,OnmsAlarmSummary> alarmsById;
 
     public TicketDetails(List<EventRecord> cpnEventsInTicket,
+                         List<ESEventDTO> onmsEvents,
                          Map<String, Integer> cpnEventIdToOnmsEventIds,
                          Map<Integer, Integer> onmsEventIdToAlarmId,
                          Map<Integer, Integer> alarmIdToSituationId,
-                         Map<Integer,OnmsAlarmSummary> alarmsById,
+                         Map<Integer, OnmsAlarmSummary> alarmsById,
                          Map<Integer, SituationAndEvents> situationsById) {
         this.cpnEventsInTicket = Objects.requireNonNull(cpnEventsInTicket);
+        this.onmsEvents = Objects.requireNonNull(onmsEvents);
         this.cpnEventIdToOnmsEventIds = Objects.requireNonNull(cpnEventIdToOnmsEventIds);
         this.onmsEventIdToAlarmId = Objects.requireNonNull(onmsEventIdToAlarmId);
         this.alarmIdToSituationId = Objects.requireNonNull(alarmIdToSituationId);
@@ -79,6 +83,14 @@ public class TicketDetails {
 
     public boolean didMatchAllEvents() {
         return didMatchAllEvents;
+    }
+
+    public List<ESEventDTO> getOnmsEvents() {
+        return onmsEvents;
+    }
+
+    public Map<Integer, SituationAndEvents> getSituationsById() {
+        return situationsById;
     }
 
     public void prettyPrint() {

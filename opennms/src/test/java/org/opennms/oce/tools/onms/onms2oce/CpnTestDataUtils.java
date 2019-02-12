@@ -58,7 +58,7 @@ public class CpnTestDataUtils {
         return new StaticCpnDatasetViewer(view, tickets, serviceEvents, syslogEvents, trapsEvents);
     }
 
-    private static <T> List<T> json2list(URL url, Class<T> clazz) {
+    protected static <T> List<T> json2list(URL url, Class<T> clazz) {
         try {
             final String json = Resources.toString(url, StandardCharsets.UTF_8);
             return (List<T>) Arrays.asList(new Gson().fromJson(json, getArrayClass(clazz)));
@@ -67,7 +67,7 @@ public class CpnTestDataUtils {
         }
     }
 
-    private static <T> Class<? extends T[]> getArrayClass(Class<T> clazz) {
+    protected static <T> Class<? extends T[]> getArrayClass(Class<T> clazz) {
         return (Class<? extends T[]>) Array.newInstance(clazz, 0).getClass();
     }
 }

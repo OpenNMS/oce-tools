@@ -34,6 +34,7 @@ import java.io.IOException;
 import org.kohsuke.args4j.Option;
 import org.opennms.oce.tools.cpn.view.CpnDatasetView;
 import org.opennms.oce.tools.cpn.view.ESBackedCpnDatasetViewer;
+import org.opennms.oce.tools.onms.onms2oce.FaultDataset;
 import org.opennms.oce.tools.onms.onms2oce.HybridOnmsCpnOceGenerator;
 
 import com.google.common.collect.Sets;
@@ -56,9 +57,6 @@ public class HybridOnmsCpnOceExportCommand extends AbstractCommand {
 
     @Option(name="--exclude-service-events",usage="Exclude service events and alarms from tickets")
     private boolean excludeServiceEvents = true;
-
-    @Option(name="--no-model",usage="Disable model generation")
-    private boolean modelGenerationDisabled = false;
 
     @Option(name="--include-ticket-with-one-alarm",usage="Include tickets with a single event/alarm")
     private boolean includeTicketsWithASingleAlarm = false;
@@ -90,10 +88,9 @@ public class HybridOnmsCpnOceExportCommand extends AbstractCommand {
                 .withViewer(new ESBackedCpnDatasetViewer(context.getEsClient(), viewBuilder.build()))
                 .withNodeAndFactsService(context.getNodeAndFactsService())
                 .withTicketId(ticketId)
-                .withTargetFolder(targetFolder)
-                .withModelGenerationDisabled(modelGenerationDisabled)
                 .build();
-        oceGenerator.generate();
-        oceGenerator.writeResultsToDisk();
+
+        final FaultDataset faultDataset = oceGenerator.generate();
+        faultDataset.marshalToDisk(targetFolder);
     }
 }

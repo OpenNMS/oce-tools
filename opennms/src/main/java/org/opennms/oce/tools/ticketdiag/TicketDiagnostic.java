@@ -30,6 +30,7 @@ package org.opennms.oce.tools.ticketdiag;
 
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -43,6 +44,7 @@ import org.opennms.oce.tools.cpn.EventUtils;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.TicketRecord;
 import org.opennms.oce.tools.cpn.view.CpnDatasetViewer;
+import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.svc.NodeAndFactsService;
 import org.opennms.oce.tools.tsaudit.NodeAndEvents;
 import org.opennms.oce.tools.tsaudit.NodeAndFacts;
@@ -66,6 +68,10 @@ public class TicketDiagnostic {
         // Retrieve the events
         final List<EventRecord> eventsInTicket = new LinkedList<>();
         viewer.getEventsInTicket(ticket, eventsInTicket::addAll);
+
+
+        final Set<String> eventIdsInTicket = new LinkedHashSet<>();
+        eventsInTicket.forEach(e -> eventIdsInTicket.add(e.getEventId()));
 
         // Gather the set of hostnames from the events
         final Set<String> hostnames = new LinkedHashSet<>();
@@ -94,32 +100,71 @@ public class TicketDiagnostic {
             }
         }
 
-        // Abort if there are problems with any of the nodes
+        // Abort if there are problems with any of the nodes in the ticket
         if (!canProcessAllNodes) {
             System.out.println("One or more nodes in the ticket cannot be processed. Aborting.");
             return null;
         }
 
-        // Build the tree on the other side
+        // Compute the event and alarm maps
         final Map<String, Integer> cpnEventIdToOnmsEventIds = new LinkedHashMap<>();
+        final Map<Integer, String> onmsEventIdToCpnEventIds = new LinkedHashMap<>();
+
         final Map<Integer, Integer> onmsEventIdToAlarmId = new LinkedHashMap<>();
         final Map<Integer, Integer> alarmIdToSituationId = new LinkedHashMap<>();
         final Map<Integer, SituationAndEvents> situationsById = new LinkedHashMap<>();
         final Map<Integer, OnmsAlarmSummary> alarmsById = new LinkedHashMap<>();
+        final Map<Integer, ESEventDTO> eventsById = new LinkedHashMap<>();
 
         for (NodeAndFacts nodeAndFact : nodesAndFacts) {
             final NodeAndEvents nodeAndEvents = nodeAndFactsService.retrieveAndPairEvents(nodeAndFact);
+
             for (Map.Entry<String, Integer> cpnEventIdToOnmsEventId : nodeAndEvents.getMatchedEvents().entrySet()) {
+                if (!eventIdsInTicket.contains(cpnEventIdToOnmsEventId.getKey())) {
+                    // Skip events that are not in the ticket
+                    continue;
+                }
+
                 cpnEventIdToOnmsEventIds.put(cpnEventIdToOnmsEventId.getKey(), cpnEventIdToOnmsEventId.getValue());
+                onmsEventIdToCpnEventIds.put(cpnEventIdToOnmsEventId.getValue(), cpnEventIdToOnmsEventId.getKey());
             }
 
+            // Only include OpenNMS events that have a corresponding CPN event
+            nodeAndEvents.getOnmsEvents().forEach(e -> {
+                if (cpnEventIdToOnmsEventIds.values().contains(e.getId())) {
+                    eventsById.put(e.getId(), e);
+                }
+            });
+
+            // Gather all alarms and situations for the given time range on the node
             final SituationsAlarmsAndEvents situationsAlarmsAndEvents = nodeAndFactsService.getSituationsAlarmsAndEvents(nodeAndEvents);
-            onmsEventIdToAlarmId.putAll(situationsAlarmsAndEvents.getEventIdToAlarmId());
-            alarmIdToSituationId.putAll(situationsAlarmsAndEvents.getAlarmIdToSituationId());
-            situationsById.putAll(situationsAlarmsAndEvents.getSituationsById());
-            alarmsById.putAll(situationsAlarmsAndEvents.getAlarmsById());
+            // Only include OpenNMS events that have a corresponding CPN event
+            situationsAlarmsAndEvents.getEventIdToAlarmId().forEach((onmsEventId, onmsAlarmId) -> {
+                if (onmsEventIdToCpnEventIds.containsKey(onmsEventId)) {
+                    onmsEventIdToAlarmId.put(onmsEventId, onmsAlarmId);
+                }
+            });
+            // Only include OpenNMS alarms that have a corresponding mapped OpenNMS event
+            situationsAlarmsAndEvents.getAlarmIdToSituationId().forEach((alarmId, situationId) -> {
+                if (onmsEventIdToAlarmId.values().contains(alarmId)) { // TODO: Quicker lookup
+                    alarmIdToSituationId.put(alarmId, situationId);
+                }
+            });
+            // Only include OpenNMS alarms that have a corresponding mapped OpenNMS event
+            situationsAlarmsAndEvents.getAlarmsById().forEach((alarmId, alarm) -> {
+                if (onmsEventIdToAlarmId.values().contains(alarmId)) { // TODO: Quicker lookup
+                    alarmsById.put(alarmId, alarm);
+                }
+            });
+            // Only include OpenNMS situations that have a corresponding mapped OpenNMS event
+            situationsAlarmsAndEvents.getSituationsById().forEach((situationId, situation) -> {
+                if (alarmIdToSituationId.values().contains(situationId)) { // TODO: Quicker lookup
+                    situationsById.put(situationId, situation);
+                }
+            });
         }
 
-        return new TicketDetails(eventsInTicket, cpnEventIdToOnmsEventIds, onmsEventIdToAlarmId, alarmIdToSituationId, alarmsById, situationsById);
+        return new TicketDetails(eventsInTicket, new ArrayList<>(eventsById.values()),
+                cpnEventIdToOnmsEventIds, onmsEventIdToAlarmId, alarmIdToSituationId, alarmsById, situationsById);
     }
 }

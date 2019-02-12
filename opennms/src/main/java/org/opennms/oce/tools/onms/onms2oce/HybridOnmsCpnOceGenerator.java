@@ -28,26 +28,28 @@
 
 package org.opennms.oce.tools.onms.onms2oce;
 
-import java.io.File;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.Marshaller;
-
+import org.opennms.netmgt.model.alarm.AlarmSummary;
+import org.opennms.oce.datasource.v1.schema.Alarm;
 import org.opennms.oce.datasource.v1.schema.AlarmRef;
 import org.opennms.oce.datasource.v1.schema.Alarms;
-import org.opennms.oce.datasource.v1.schema.Inventory;
-import org.opennms.oce.datasource.v1.schema.MetaModel;
+import org.opennms.oce.datasource.v1.schema.Event;
 import org.opennms.oce.datasource.v1.schema.Severity;
 import org.opennms.oce.datasource.v1.schema.Situation;
 import org.opennms.oce.datasource.v1.schema.Situations;
 import org.opennms.oce.tools.cpn.model.EventSeverity;
 import org.opennms.oce.tools.cpn.model.TicketRecord;
 import org.opennms.oce.tools.cpn.view.CpnDatasetViewer;
+import org.opennms.oce.tools.onms.client.ESEventDTO;
 import org.opennms.oce.tools.svc.NodeAndFactsService;
 import org.opennms.oce.tools.ticketdiag.TicketDetails;
 import org.opennms.oce.tools.ticketdiag.TicketDiagnostic;
@@ -64,19 +66,10 @@ public class HybridOnmsCpnOceGenerator {
 
     private final CpnDatasetViewer viewer;
     private final NodeAndFactsService nodeAndFactsService;
-    private final boolean modelGenerationDisabled;
-    private final File targetFolder;
-    private String ticketId;
-
-    private Situations situations;
-    private MetaModel metaModel;
-    private Inventory inventory;
-    private Alarms alarms;
+    private final String ticketId;
 
     public static class Builder {
         private CpnDatasetViewer viewer;
-        private boolean modelGenerationDisabled = false;
-        private File targetFolder;
         private String ticketId;
         private NodeAndFactsService nodeAndFactsService;
 
@@ -90,16 +83,6 @@ public class HybridOnmsCpnOceGenerator {
             return this;
         }
 
-        public Builder withModelGenerationDisabled(boolean modelGenerationDisabled) {
-            this.modelGenerationDisabled = modelGenerationDisabled;
-            return this;
-        }
-
-        public Builder withTargetFolder(File targetFolder) {
-            this.targetFolder = targetFolder;
-            return this;
-        }
-
         public Builder withTicketId(String ticketId) {
             this.ticketId = ticketId;
             return this;
@@ -110,21 +93,18 @@ public class HybridOnmsCpnOceGenerator {
             Objects.requireNonNull(nodeAndFactsService, "nodeAndFactsService is required.");
             return new HybridOnmsCpnOceGenerator(this);
         }
-
     }
 
     private HybridOnmsCpnOceGenerator(Builder builder) {
         this.viewer = builder.viewer;
         this.nodeAndFactsService = builder.nodeAndFactsService;
-        this.modelGenerationDisabled = builder.modelGenerationDisabled;
-        this.targetFolder = builder.targetFolder;
         this.ticketId = builder.ticketId;
     }
 
-    public void generate() {
+    public FaultDataset generate() {
         LOG.info("Generating the situations and alarms..");
-        situations = new Situations();
-        alarms = new Alarms();
+        final Situations situations = new Situations();
+        final Alarms alarms = new Alarms();
 
         final List<TicketRecord> filteredTickets = new LinkedList<>();
         if (ticketId == null) {
@@ -152,9 +132,11 @@ public class HybridOnmsCpnOceGenerator {
         }
 
         // Generate the list of situations and alarms
+        final List<OnmsAlarmSummary> alarmSummaries = new LinkedList<>();
         for (Map.Entry<TicketRecord,TicketDetails> entry : ticketDetailsByTicket.entrySet()) {
             final TicketRecord t = entry.getKey();
             final TicketDetails details = entry.getValue();
+            alarmSummaries.addAll(details.getAlarmSummaries());
 
             final Situation situation = new Situation();
             situation.setId(t.getTicketId());
@@ -163,59 +145,64 @@ public class HybridOnmsCpnOceGenerator {
             situation.setSummary(t.getDescription());
             situation.setDescription(t.getDescription());
 
-            for (OnmsAlarmSummary alarmSummary : details.getAlarmSummaries()) {
-                situation.getAlarmRef().add(toAlarmRef(alarmSummary));
-                alarms.getAlarm().add(alarmSummary.toAlarm());
+            // Group the summaries by reduction key
+            final Map<String, List<OnmsAlarmSummary>> alarmSummariesByReductionKey = details.getAlarmSummaries().stream()
+                    .collect(Collectors.groupingBy(OnmsAlarmSummary::getReductionKey));
+
+            // Associate the situation with the reduction key, scoped by ticket id
+            for (String reductionKey : alarmSummariesByReductionKey.keySet()) {
+                final AlarmRef cause = new AlarmRef();
+                cause.setId(reductionKey + "-" + t.getTicketId());
+                situation.getAlarmRef().add(cause);
             }
+
+            // Convert the alarm summaries to alarms
+            alarmSummariesByReductionKey.forEach((reductionKey, summaries) -> {
+                final List<Alarm> alarmsForSummaries = summaries.stream()
+                        .map(OnmsAlarmSummary::toAlarm)
+                        .collect(Collectors.toList());
+                alarms.getAlarm().add(merge(reductionKey + "-" + t.getTicketId(), alarmsForSummaries));
+            });
 
             situations.getSituation().add(situation);
         }
+
+        // Generate the model
+        OnmsOceModelGenerator gen = new OnmsOceModelGenerator(alarmSummaries);
+        gen.generate();
+
+        // Return the dataset
+        return new FaultDataset(situations, alarms, gen.getMetaModel(), gen.getInventory());
     }
 
-    public void writeResultsToDisk() {
-        Objects.requireNonNull(targetFolder, "target folder must be set");
-        LOG.info("Marshalling results to disk...");
-        try {
-            JAXBContext jaxbContext = JAXBContext.newInstance(MetaModel.class, Inventory.class, Alarms.class, Situations.class);
-            Marshaller marshaller = jaxbContext.createMarshaller();
-            marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
-
-            if (metaModel != null && inventory != null) {
-                LOG.info("Writing {} model object definitions (meta-model)...", metaModel.getModelObjectDef().size());
-                marshaller.marshal(metaModel, new File(targetFolder, "cpn.metamodel.xml"));
-                LOG.info("Writing {} model object entries (inventory)...", inventory.getModelObjectEntry().size());
-                marshaller.marshal(inventory, new File(targetFolder, "cpn.inventory.xml"));
-            }
-            LOG.info("Writing {} alarms...", alarms.getAlarm().size());
-            marshaller.marshal(alarms, new File(targetFolder, "cpn.alarms.xml"));
-            LOG.info("Writing {} situations...", situations.getSituation().size());
-            marshaller.marshal(situations, new File(targetFolder, "cpn.situations.xml"));
-        } catch (Exception e) {
-            LOG.error("Oops", e);
+    private static Alarm merge(String id, List<Alarm> alarms) {
+        // Sort by event time
+        alarms.sort(Comparator.comparing(Alarm::getFirstEventTime));
+        if (alarms.isEmpty()) {
+            throw new IllegalStateException("empty alarms for: "  + id);
         }
-        LOG.info("Done.");
-    }
 
-    public Situations getSituations() {
-        return situations;
-    }
+        final Alarm firstAlarm = alarms.get(0);
+        final Alarm lastAlarm = alarms.get(alarms.size() - 1);
 
-    public MetaModel getMetaModel() {
-        return metaModel;
-    }
+        final Alarm alarm = new Alarm();
+        alarm.setId(id);
 
-    public Inventory getInventory() {
-        return inventory;
-    }
+        alarm.setSummary(firstAlarm.getSummary());
+        alarm.setDescription(firstAlarm.getDescription());
+        alarm.setFirstEventTime(firstAlarm.getFirstEventTime());
+        alarm.setLastEventTime(lastAlarm.getLastEventTime());
 
-    public Alarms getAlarms() {
-        return alarms;
-    }
+        for (Alarm a: alarms) {
+            alarm.getEvent().addAll(a.getEvent());
+        }
+        alarm.getEvent().sort(Comparator.comparing(Event::getTime));
 
-    private static AlarmRef toAlarmRef(OnmsAlarmSummary alarmSummary) {
-        final AlarmRef cause = new AlarmRef();
-        cause.setId(Integer.toString(alarmSummary.getId()));
-        return cause;
+        alarm.setInventoryObjectType(firstAlarm.getInventoryObjectType());
+        alarm.setInventoryObjectId(firstAlarm.getInventoryObjectId());
+        alarm.setLastSeverity(lastAlarm.getLastSeverity());
+        return alarm;
+
     }
 
     private static Severity toSeverity(EventSeverity severity) {
