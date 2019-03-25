@@ -101,6 +101,7 @@ public class CpnOnmsSyslogAudit extends AbstractCommand {
     }
 
     private void consumeSyslogBatch(List<EventRecord> batchOfSyslogs) {
+        System.out.printf("Processed %d Syslog messages.\n", processedCount);
         batchOfSyslogs.stream()
                 .filter(event -> !EventUtils.isClear(event))
                 .forEach(syslog -> {
@@ -113,11 +114,12 @@ public class CpnOnmsSyslogAudit extends AbstractCommand {
                     try {
                         parsedSyslogOpt = Optional.of(parseFuture.get());
                     } catch (InterruptedException | ExecutionException e) {
+                        System.out.printf("Exception while parsing: %s\n", detailedDescription);
                         e.printStackTrace();
                     }
 
                     SyslogMessage parsedSyslog = parsedSyslogOpt.orElseThrow(() -> 
-                            new RuntimeException("Parser failed to return a parsed syslog message"));
+                            new RuntimeException("Parser failed to return a parsed syslog message - syslog parser could not decode the message"));
                     String parsedMessage = parsedSyslog.getMessage();
 
                     if (!passedHeaderParsing(parsedMessage)) {
@@ -135,12 +137,13 @@ public class CpnOnmsSyslogAudit extends AbstractCommand {
                             failedBodyParsingCount++;
 
                             if (!countOnly) {
-                                System.out.println("FAILED to parse body");
+                                System.out.println("FAILED to parse body - no corresponding event definition matched");
                                 System.out.println("Input:\n" + detailedDescription);
                                 System.out.println("Result:\n" + parsedSyslog + "\n");
                             }
                         }
                     } catch (Exception e) {
+                        System.out.printf("Exception while parsing: %s\n", parsedMessage);
                         e.printStackTrace();
                     }
                 });

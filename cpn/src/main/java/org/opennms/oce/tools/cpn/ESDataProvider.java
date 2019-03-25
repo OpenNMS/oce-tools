@@ -274,8 +274,8 @@ public class ESDataProvider implements CpnEntityDao {
         getSyslogRecords(searchSourceBuilder.toString(), callback);
     }
 
-    public void getSyslogRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, Consumer<List<EventRecord>> callback) throws IOException {
-        getSyslogRecordsInRange(startTime, endTime, callback);
+    public void getSyslogRecordsInRange(ZonedDateTime startTime, ZonedDateTime endTime, Consumer<List<EventRecord>> callback) {
+        getSyslogRecordsInRange(startTime, endTime, Collections.emptyList(), Collections.emptyList(), callback);
     }
 
     @Override

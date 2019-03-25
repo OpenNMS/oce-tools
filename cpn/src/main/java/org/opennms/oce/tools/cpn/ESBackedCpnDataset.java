@@ -76,11 +76,7 @@ public class ESBackedCpnDataset implements CpnDataset {
     @Override
     public List<EventRecord> getSyslogEvents() {
         final List<EventRecord> syslogs = new LinkedList<>();
-        try {
-            esDataProvider.getSyslogRecordsInRange(start, end, syslogs::addAll);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        esDataProvider.getSyslogRecordsInRange(start, end, syslogs::addAll);
         return syslogs;
     }
 
