@@ -34,6 +34,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import javax.xml.bind.JAXBContext;
@@ -49,6 +51,7 @@ import org.opennms.oce.datasource.v1.schema.MetaModel;
 import org.opennms.oce.datasource.v1.schema.Severity;
 import org.opennms.oce.datasource.v1.schema.Situation;
 import org.opennms.oce.datasource.v1.schema.Situations;
+import org.opennms.oce.opennms.model.ManagedObjectType;
 import org.opennms.oce.tools.cpn.EventUtils;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.EventSeverity;
@@ -131,6 +134,8 @@ public class OceGenerator  {
         }
 
         final List<EventRecord> allEventsInTickets = new LinkedList<>();
+        final int numTicketsTotal = filteredTickets.size();
+        int numTicketsProcessed = 0;
         for (TicketRecord t : filteredTickets) {
             final Situation situation = new Situation();
             situation.setId(t.getTicketId());
@@ -148,15 +153,12 @@ public class OceGenerator  {
                         continue;
                     }
                     if (EventUtils.isClear(e)) {
-                        // Ignore clears
+                        // Include clears, but don't attempt to match them to a definition
+                        eventsInTicket.add(e);
                         continue;
                     }
                     final EventDefinition matchingDef = getMachingEvenfDef(e);
-                    if (matchingDef == null) {
-                        LOG.warn("No matching event definition for: {}. Skipping.", e);
-                        continue;
-                    }
-                    if (matchingDef.isIgnored()) {
+                    if (matchingDef != null && matchingDef.isIgnored()) {
                         // Ignore
                         continue;
                     }
@@ -170,6 +172,12 @@ public class OceGenerator  {
             allEventsInTickets.addAll(eventsInTicket);
             situation.getAlarmRef().addAll(getCausalityTree(t, eventsInTicket));
             situations.getSituation().add(situation);
+
+            // Display progress
+            numTicketsProcessed++;
+            if (numTicketsProcessed % 100 == 1) {
+                LOG.info(String.format("Processed %d tickets (%.2f%%).", numTicketsProcessed, (numTicketsProcessed / (float)numTicketsTotal)* 100));
+            }
         }
 
         if (!modelGenerationDisabled) {
@@ -207,6 +215,7 @@ public class OceGenerator  {
             alarm.setLastEventTime(lastEvent.getTime().getTime());
             alarms.getAlarm().add(alarm);
 
+            ModelObject lastModelObject = null;
             for (EventRecord e : events) {
                 final Event event = new Event();
                 event.setId(e.getEventId());
@@ -219,12 +228,19 @@ public class OceGenerator  {
 
                 if (alarm.getInventoryObjectType() == null && alarm.getInventoryObjectId() == null) {
                     final EventDefinition matchingDef = getMachingEvenfDef(e);
-                    if (matchingDef == null) {
-                        throw new IllegalStateException("Should not happen!");
+                    if (matchingDef != null) {
+                        final ModelObject modelObject = matchingDef.getModelObjectTree(e);
+                        alarm.setInventoryObjectType(modelObject.getType().toString());
+                        alarm.setInventoryObjectId(modelObject.getId());
+                        lastModelObject = modelObject;
+                    } else if (lastModelObject != null) {
+                        alarm.setInventoryObjectType(lastModelObject.getType().toString());
+                        alarm.setInventoryObjectId(lastModelObject.getId());
+                    } else {
+                        // Default to the node
+                        alarm.setInventoryObjectType(ManagedObjectType.Node.toString());
+                        alarm.setInventoryObjectId(EventUtils.getNodeLabelFromLocation(e.getLocation()));
                     }
-                    final ModelObject modelObject = matchingDef.getModelObjectTree(e);
-                    alarm.setInventoryObjectType(modelObject.getType().toString());
-                    alarm.setInventoryObjectId(modelObject.getId());
                 }
             }
         });

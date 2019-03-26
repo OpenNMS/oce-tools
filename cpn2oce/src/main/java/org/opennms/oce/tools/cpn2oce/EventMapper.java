@@ -80,6 +80,7 @@ public class EventMapper {
                     .forDescr("Link up syslog")
                     .forDescr("Interface down due to module syslog")
                     .forDescr("PortChannel Interface is down syslog")
+                    .forDescr("PortChannel Interface is up syslog")
                     .forDescr("VLAN Sub Interface oper down")
                     .forDescr("VLAN Sub Interface up")
                     .forDescr("Fex Port Status Noti Disconnected")
