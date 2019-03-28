@@ -82,11 +82,11 @@ public class OceGeneratorTest {
         for (Alarm alarm : alarms.getAlarm()) {
             alarmsAssociatedTo.add(ResourceKey.key(alarm.getInventoryObjectType(), alarm.getInventoryObjectId()));
         }
-        assertThat(alarmsAssociatedTo, containsInAnyOrder(ResourceKey.key("SnmpInterface", "dc1-sw01: GigabitEthernet2/0/27"),
-                ResourceKey.key("Node", "dc1-sw01: GigabitEthernet2/0/27: 10.1.1.85"),
-                ResourceKey.key("SnmpInterfaceLink", "dc1-sw01: GigabitEthernet2/0/27<->dc2-sw01: GigabitEthernet2/0/27"),
-                ResourceKey.key("SnmpInterface", "dc2-sw01: GigabitEthernet2/0/27"),
-                ResourceKey.key("Node", "dc2-sw01: GigabitEthernet2/0/27: 10.1.1.86")));
+        assertThat(alarmsAssociatedTo, containsInAnyOrder(ResourceKey.key("SnmpInterface", "dc1-sw01: gigabitethernet2/0/27"),
+                ResourceKey.key("Node", "dc1-sw01: gigabitethernet2/0/27: 10.1.1.85"),
+                ResourceKey.key("SnmpInterfaceLink", "dc1-sw01: gigabitethernet2/0/27<->dc2-sw01: gigabitethernet2/0/27"),
+                ResourceKey.key("SnmpInterface", "dc2-sw01: gigabitethernet2/0/27"),
+                ResourceKey.key("Node", "dc2-sw01: gigabitethernet2/0/27: 10.1.1.86")));
     }
 
 }

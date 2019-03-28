@@ -85,7 +85,7 @@ public class EventMapper {
                     .forDescr("VLAN Sub Interface up")
                     .forDescr("Fex Port Status Noti Disconnected")
                     .forDescr("Configuration error has occurred syslog")
-                    .forDescr("Fex Port Status Noti Configure")
+                    .forDescrMatching("Fex Port Status .*")
                     .forDescr("Link down due to admin down")
                     .forDescr("Link down due to oper down")
                     .withType(ManagedObjectType.SnmpInterface)
@@ -527,6 +527,10 @@ public class EventMapper {
             String deviceA = m.group(1);
             String portA = m.group(2);
             String portB = m.group(3);
+
+            if (portA.equals("IP")) { // Objects of the type: CORE: IP Vlan3148 should be interfaces, not links
+                throw new IllegalArgumentException("Failed to parse: " + location);
+            }
 
             ModelObject deviceANode = new ModelObject(deviceA, deviceA, ManagedObjectType.Node);
             ModelObject portANode = new ModelObject(deviceA + ": " + portA, portA, ManagedObjectType.SnmpInterface, deviceANode);

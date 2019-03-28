@@ -43,18 +43,18 @@ public class OceModelObjetKeyMapperTest {
 
     @Test
     public void canGetRelatedObjectIds() {
-        ModelObject mo = mapper.parse("BFD connectivity down", "agg-red: BundleEthernet1.3509<->agg-blue: BundleEthernet1.3509");
+        ModelObject mo = mapper.parse("BFD connectivity down", "agg-red: bundleethernet1.3509<->agg-blue: bundleethernet1.3509");
         List<ModelObjectKey> keys = OceModelObjetKeyMapper.getRelatedObjectIds(mo);
 
         assertThat(keys, containsInAnyOrder(
-                new ModelObjectKey("Node,agg-red","SnmpInterface,agg-red: BundleEthernet1.3509","SnmpInterfaceLink,agg-red: BundleEthernet1.3509<->agg-blue: BundleEthernet1.3509" ),
-                new ModelObjectKey("Node,agg-blue","SnmpInterface,agg-blue: BundleEthernet1.3509","SnmpInterfaceLink,agg-red: BundleEthernet1.3509<->agg-blue: BundleEthernet1.3509")
+                new ModelObjectKey("Node,agg-red","SnmpInterface,agg-red: bundleethernet1.3509","SnmpInterfaceLink,agg-red: bundleethernet1.3509<->agg-blue: bundleethernet1.3509" ),
+                new ModelObjectKey("Node,agg-blue","SnmpInterface,agg-blue: bundleethernet1.3509","SnmpInterfaceLink,agg-red: bundleethernet1.3509<->agg-blue: bundleethernet1.3509")
         ));
 
         mo = mapper.parse("CPU utilization exceeded upper threshold", "infra-blue");
         keys = OceModelObjetKeyMapper.getRelatedObjectIds(mo);
         assertThat(keys, contains(
-                new ModelObjectKey("Node,infra-blue", "EntPhysicalEntity,CPU on infra-blue")
+                new ModelObjectKey("Node,infra-blue", "EntPhysicalEntity,cpu on infra-blue")
         ));
 
     }

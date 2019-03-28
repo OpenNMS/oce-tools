@@ -39,6 +39,7 @@ import java.util.List;
 
 import org.junit.Test;
 import org.opennms.oce.opennms.model.ManagedObjectType;
+import org.opennms.oce.tools.cpn.events.EventRecordLite;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.view.CpnDatasetView;
 import org.opennms.oce.tools.cpn.view.StaticCpnDatasetViewer;
@@ -109,7 +110,56 @@ public class EventMapperTest {
         }
     }
 
-    private static EventDefinition getMachingEvenfDef(EventRecord e) {
+    @Test
+    public void canParseInterfaceDownServiceEvents() {
+        EventRecordLite record = new EventRecordLite() {
+            @Override
+            public String getDescription() {
+                return "Interface status down";
+            }
+
+            @Override
+            public String getLocation() {
+                return "CORE: IP Vlan3148";
+            }
+        };
+
+        EventDefinition def = getMachingEvenfDef(record);
+        assertThat(def, notNullValue());
+        ModelObject mo = def.getModelObjectTree(record);
+        assertThat(mo.getType(), equalTo(ManagedObjectType.SnmpInterface));
+        assertThat(mo.getId(), equalTo("core: ip vlan3148"));
+        ModelObject parent = mo.getParent();
+        assertThat(parent.getType(), equalTo(ManagedObjectType.Node));
+        assertThat(parent.getId(), equalTo("core"));
+    }
+
+
+    @Test
+    public void canParseFexPortEvents() {
+        EventRecordLite record = new EventRecordLite() {
+            @Override
+            public String getDescription() {
+                return "Fex Port Status ****anything****";
+            }
+
+            @Override
+            public String getLocation() {
+                return "blue: Ethernet3/9/2";
+            }
+        };
+
+        EventDefinition def = getMachingEvenfDef(record);
+        assertThat(def, notNullValue());
+        ModelObject mo = def.getModelObjectTree(record);
+        assertThat(mo.getType(), equalTo(ManagedObjectType.SnmpInterface));
+        assertThat(mo.getId(), equalTo("blue: ethernet3/9/2"));
+        ModelObject parent = mo.getParent();
+        assertThat(parent.getType(), equalTo(ManagedObjectType.Node));
+        assertThat(parent.getId(), equalTo("blue"));
+    }
+
+    private static EventDefinition getMachingEvenfDef(EventRecordLite e) {
         for (EventDefinition def : EventMapper.EVENT_DEFS) {
             if (def.matches(e)) {
                 return def;

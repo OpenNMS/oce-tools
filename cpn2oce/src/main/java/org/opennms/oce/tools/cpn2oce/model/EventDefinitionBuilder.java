@@ -51,6 +51,11 @@ public class EventDefinitionBuilder {
         return this;
     }
 
+    public EventDefinitionBuilder forDescrMatching(String descriptionRegex) {
+        matchers.add(new RegexDescriptionMatcher(descriptionRegex));
+        return this;
+    }
+
     public EventDefinitionBuilder withType(ManagedObjectType type) {
         this.types.add(type);
         return this;

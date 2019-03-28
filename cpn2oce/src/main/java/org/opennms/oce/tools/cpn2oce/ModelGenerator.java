@@ -46,6 +46,7 @@ import org.opennms.oce.datasource.v1.schema.PeerRef;
 import org.opennms.oce.datasource.v1.schema.RelativeDefRef;
 import org.opennms.oce.datasource.v1.schema.RelativeRef;
 import org.opennms.oce.opennms.model.ManagedObjectType;
+import org.opennms.oce.tools.cpn.EventUtils;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn2oce.model.ModelObject;
 
@@ -68,10 +69,12 @@ public class ModelGenerator {
         // Generate and flatten the tree of MOs
         final Set<ModelObject> allMos = new LinkedHashSet<>();
         for (EventRecord e : events) {
-            final ModelObject mo = mapper.parse(e);
-            if (mo != null) {
-                allMos.add(mo);
+            ModelObject mo = mapper.parse(e);
+            if (mo == null) {
+                final String nodeId = EventUtils.getNodeLabelFromLocation(e.getLocation());
+                mo = new ModelObject(nodeId, nodeId, ManagedObjectType.Node);
             }
+            allMos.add(mo);
         }
 
         final Set<ModelObject> relatedMos = new LinkedHashSet<>();

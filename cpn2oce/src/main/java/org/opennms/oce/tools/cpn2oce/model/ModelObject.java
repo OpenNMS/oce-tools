@@ -58,7 +58,7 @@ public class ModelObject {
     }
 
     public ModelObject(String id, String specificId, ManagedObjectType type, ModelObject parent, List<ModelObject> peers) {
-        this.id = Objects.requireNonNull(id);
+        this.id = Objects.requireNonNull(id).toLowerCase();
         this.specificId =  specificId;
         this.type = Objects.requireNonNull(type);
         this.parent = parent;
