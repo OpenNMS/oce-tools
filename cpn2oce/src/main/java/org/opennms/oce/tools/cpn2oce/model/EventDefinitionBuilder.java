@@ -36,7 +36,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 
-import org.opennms.oce.opennms.model.ManagedObjectType;
+import org.opennms.alec.opennms.model.ManagedObjectType;
 import org.opennms.oce.tools.cpn.events.EventRecordLite;
 
 public class EventDefinitionBuilder {

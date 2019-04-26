@@ -46,7 +46,7 @@ import org.opennms.netmgt.syslogd.ByteBufferParser;
 import org.opennms.netmgt.syslogd.ConvertToEvent;
 import org.opennms.netmgt.syslogd.RadixTreeSyslogParser;
 import org.opennms.netmgt.syslogd.SyslogMessage;
-import org.opennms.oce.integrations.opennms.config.CiscoSyslogMatchExtension;
+import org.opennms.alec.integrations.opennms.config.CiscoSyslogMatchExtension;
 import org.opennms.oce.tools.cpn.ESDataProvider;
 import org.opennms.oce.tools.cpn.EventUtils;
 import org.opennms.oce.tools.cpn.model.EventRecord;

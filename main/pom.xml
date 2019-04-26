@@ -117,9 +117,9 @@
             <artifactId>args4j</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.opennms.oce.integrations.opennms</groupId>
+            <groupId>org.opennms.alec.integrations.opennms</groupId>
             <artifactId>config</artifactId>
-            <version>${oce.version}</version>
+            <version>${alec.version}</version>
         </dependency>
 
         <!-- Test -->

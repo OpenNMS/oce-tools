@@ -33,19 +33,19 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.opennms.oce.datasource</groupId>
-            <artifactId>org.opennms.oce.datasource.jaxb</artifactId>
-            <version>${oce.version}</version>
+            <groupId>org.opennms.alec.datasource</groupId>
+            <artifactId>org.opennms.alec.datasource.jaxb</artifactId>
+            <version>${alec.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.opennms.oce.datasource</groupId>
-            <artifactId>org.opennms.oce.datasource.opennms-common</artifactId>
-            <version>${oce.version}</version>
+            <groupId>org.opennms.alec.datasource</groupId>
+            <artifactId>org.opennms.alec.datasource.opennms-common</artifactId>
+            <version>${alec.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.opennms.oce.integrations.opennms</groupId>
+            <groupId>org.opennms.alec.integrations.opennms</groupId>
             <artifactId>model</artifactId>
-            <version>${oce.version}</version>
+            <version>${alec.version}</version>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>

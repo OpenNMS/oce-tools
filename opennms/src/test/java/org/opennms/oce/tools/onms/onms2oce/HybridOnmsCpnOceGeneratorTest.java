@@ -42,9 +42,9 @@ import java.util.stream.Collectors;
 
 import org.elasticsearch.index.query.QueryBuilder;
 import org.junit.Test;
-import org.opennms.oce.datasource.v1.schema.Alarm;
-import org.opennms.oce.datasource.v1.schema.Alarms;
-import org.opennms.oce.datasource.v1.schema.Situation;
+import org.opennms.alec.datasource.v1.schema.Alarm;
+import org.opennms.alec.datasource.v1.schema.Alarms;
+import org.opennms.alec.datasource.v1.schema.Situation;
 import org.opennms.oce.tools.cpn.api.CpnEntityDao;
 import org.opennms.oce.tools.cpn.api.EmptyCpnEntityDao;
 import org.opennms.oce.tools.cpn.model.EventRecord;

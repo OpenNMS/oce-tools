@@ -37,12 +37,12 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.junit.Test;
-import org.opennms.oce.datasource.api.ResourceKey;
-import org.opennms.oce.datasource.v1.schema.Alarm;
-import org.opennms.oce.datasource.v1.schema.Alarms;
-import org.opennms.oce.datasource.v1.schema.Inventory;
-import org.opennms.oce.datasource.v1.schema.MetaModel;
-import org.opennms.oce.datasource.v1.schema.Situations;
+import org.opennms.alec.datasource.api.ResourceKey;
+import org.opennms.alec.datasource.v1.schema.Alarm;
+import org.opennms.alec.datasource.v1.schema.Alarms;
+import org.opennms.alec.datasource.v1.schema.Inventory;
+import org.opennms.alec.datasource.v1.schema.MetaModel;
+import org.opennms.alec.datasource.v1.schema.Situations;
 import org.opennms.oce.tools.cpn.view.StaticCpnDatasetViewer;
 
 public class OceGeneratorTest {

@@ -38,7 +38,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.junit.Test;
-import org.opennms.oce.opennms.model.ManagedObjectType;
+import org.opennms.alec.opennms.model.ManagedObjectType;
 import org.opennms.oce.tools.cpn.events.EventRecordLite;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.view.CpnDatasetView;

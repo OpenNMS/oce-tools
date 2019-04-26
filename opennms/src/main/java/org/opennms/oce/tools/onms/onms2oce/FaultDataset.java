@@ -34,10 +34,10 @@ import java.util.Objects;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.Marshaller;
 
-import org.opennms.oce.datasource.v1.schema.Alarms;
-import org.opennms.oce.datasource.v1.schema.Inventory;
-import org.opennms.oce.datasource.v1.schema.MetaModel;
-import org.opennms.oce.datasource.v1.schema.Situations;
+import org.opennms.alec.datasource.v1.schema.Alarms;
+import org.opennms.alec.datasource.v1.schema.Inventory;
+import org.opennms.alec.datasource.v1.schema.MetaModel;
+import org.opennms.alec.datasource.v1.schema.Situations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -33,7 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-import org.opennms.oce.opennms.model.ManagedObjectType;
+import org.opennms.alec.opennms.model.ManagedObjectType;
 
 public class ModelObject {
 

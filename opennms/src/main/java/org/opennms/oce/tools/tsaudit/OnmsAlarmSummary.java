@@ -31,9 +31,9 @@ package org.opennms.oce.tools.tsaudit;
 import java.util.List;
 import java.util.Objects;
 
-import org.opennms.oce.datasource.v1.schema.Alarm;
-import org.opennms.oce.datasource.v1.schema.Event;
-import org.opennms.oce.datasource.v1.schema.Severity;
+import org.opennms.alec.datasource.v1.schema.Alarm;
+import org.opennms.alec.datasource.v1.schema.Event;
+import org.opennms.alec.datasource.v1.schema.Severity;
 import org.opennms.oce.tools.onms.alarmdto.AlarmDocumentDTO;
 import org.opennms.oce.tools.onms.client.ESEventDTO;
 

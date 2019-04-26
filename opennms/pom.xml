@@ -45,9 +45,9 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.opennms.oce.integrations.opennms</groupId>
+            <groupId>org.opennms.alec.integrations.opennms</groupId>
             <artifactId>model</artifactId>
-            <version>${oce.version}</version>
+            <version>${alec.version}</version>
         </dependency>
 
         <dependency>
@@ -197,10 +197,21 @@
         </dependency>
     </dependencies>
 
+
     <repositories>
         <repository>
-            <id>opennms</id>
-            <url>http://maven.opennms.org/content/groups/opennms.org-snapshot</url>
+            <snapshots><enabled>false</enabled></snapshots>
+            <releases><enabled>true</enabled></releases>
+            <id>opennms-repo</id>
+            <name>OpenNMS Repository</name>
+	    <url>http://maven.opennms.org/content/groups/opennms.org-release/</url>
+        </repository>
+        <repository>
+            <snapshots><enabled>true</enabled></snapshots>
+            <releases><enabled>false</enabled></releases>
+            <id>opennms-snapshot-repo</id>
+            <name>OpenNMS Snapshot Repository</name>
+	    <url>http://maven.opennms.org/content/groups/opennms.org-snapshot/</url>
         </repository>
     </repositories>
 </project>

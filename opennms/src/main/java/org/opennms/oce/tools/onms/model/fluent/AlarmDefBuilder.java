@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.BiFunction;
 
-import org.opennms.oce.opennms.model.ManagedObjectType;
+import org.opennms.alec.opennms.model.ManagedObjectType;
 import org.opennms.oce.tools.onms.model.api.AlarmDefinition;
 import org.opennms.oce.tools.onms.model.api.EventDefinition;
 import org.opennms.oce.tools.onms.model.api.EventPayloadVisitor;

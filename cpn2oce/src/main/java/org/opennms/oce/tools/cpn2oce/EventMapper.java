@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.opennms.oce.opennms.model.ManagedObjectType;
+import org.opennms.alec.opennms.model.ManagedObjectType;
 import org.opennms.oce.tools.cpn.events.EventRecordLite;
 import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn2oce.model.CanonicalEventRecordLite;
