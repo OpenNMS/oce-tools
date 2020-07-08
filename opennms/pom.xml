@@ -27,7 +27,7 @@
     </build>
 
     <properties>
-        <jackson2.version>2.6.6</jackson2.version>
+        <jackson2.version>2.11.1</jackson2.version>
         <jersey.version>2.27</jersey.version>
         <grizzly.version>2.4.3</grizzly.version>
         <jaxrs.version>2.1</jaxrs.version>
