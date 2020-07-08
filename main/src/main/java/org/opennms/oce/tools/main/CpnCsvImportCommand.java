@@ -62,7 +62,7 @@ public class CpnCsvImportCommand extends AbstractCommand {
         final ZoneId timeZoneId = ZoneId.of(timeZone);
         LOG.info("Loading data from source folder: {}", sourceFolder);
         final CpnDataset dataset = CsvCpnDatasetLoader.loadDataset(sourceFolder, timeZoneId);
-        LOG.info("Indexing dataset in Elasticsarch.");
+        LOG.info("Indexing dataset in Elasticsearch.");
         final ESClient esClient = context.getEsClient();
         esClient.bulkIndex(dataset.getTickets(), "tickets", "ticket", TicketRecord::getTicketId);
         esClient.bulkIndex(dataset.getServiceEvents(), "services", "service", EventRecord::getEventId);
