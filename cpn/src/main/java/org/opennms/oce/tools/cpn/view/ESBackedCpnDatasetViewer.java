@@ -29,8 +29,10 @@
 package org.opennms.oce.tools.cpn.view;
 
 import java.io.IOException;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -42,10 +44,13 @@ import org.opennms.oce.tools.cpn.model.EventRecord;
 import org.opennms.oce.tools.cpn.model.TicketRecord;
 import org.opennms.oce.tools.cpn.model.TrapRecord;
 import org.opennms.oce.tools.es.ESClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.gson.Gson;
 
 import io.searchbox.client.JestResult;
+import io.searchbox.core.ClearScroll;
 import io.searchbox.core.Get;
 import io.searchbox.core.Search;
 import io.searchbox.core.SearchResult;
@@ -54,6 +59,8 @@ import io.searchbox.core.search.sort.Sort;
 import io.searchbox.params.Parameters;
 
 public class ESBackedCpnDatasetViewer implements CpnDatasetViewer {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ESBackedCpnDatasetViewer.class);
 
     private final ESClient esClient;
     private final CpnDatasetView view;
@@ -211,32 +218,51 @@ public class ESBackedCpnDatasetViewer implements CpnDatasetViewer {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        while(true) {
-            if (!result.isSucceeded()) {
-                throw new RuntimeException(result.getErrorMessage());
+
+        Set<String> scrollIds = new LinkedHashSet<>();
+        try {
+            while(true) {
+                if (!result.isSucceeded()) {
+                    throw new RuntimeException(result.getErrorMessage());
+                }
+
+                // Cast the result to a search result for easy access to the hits
+                SearchResult searchResult = new SearchResult(new Gson());
+                searchResult.setJsonObject(result.getJsonObject());
+                searchResult.setPathToResult(result.getPathToResult());
+                List<SearchResult.Hit<T, Void>> hits = searchResult.getHits(clazz);
+                if (hits.size() < 1) {
+                    break;
+                }
+
+                // Issue the callback
+                callback.accept(hits.stream().map(h -> h.source).collect(Collectors.toList()));
+
+                // Scroll
+                String scrollId = result.getJsonObject().getAsJsonPrimitive("_scroll_id").getAsString();
+                scrollIds.add(scrollId);
+                SearchScroll scroll = new SearchScroll.Builder(scrollId, "5m").build();
+                try {
+                    result = esClient.getJestClient().execute(scroll);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             }
-
-            // Cast the result to a search result for easy access to the hits
-            SearchResult searchResult = new SearchResult(new Gson());
-            searchResult.setJsonObject(result.getJsonObject());
-            searchResult.setPathToResult(result.getPathToResult());
-            List<SearchResult.Hit<T, Void>> hits = searchResult.getHits(clazz);
-            if (hits.size() < 1) {
-                break;
-            }
-
-            // Issue the callback
-            callback.accept(hits.stream().map(h -> h.source).collect(Collectors.toList()));
-
-            // Scroll
-            String scrollId = result.getJsonObject().getAsJsonPrimitive("_scroll_id").getAsString();
-            SearchScroll scroll = new SearchScroll.Builder(scrollId, "5m").build();
-            try {
-                result = esClient.getJestClient().execute(scroll);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+        } finally {
+            if (!scrollIds.isEmpty()) {
+                ClearScroll clearScroll = new ClearScroll.Builder()
+                        .addScrollIds(scrollIds).build();
+                try {
+                    JestResult clearResult = esClient.getJestClient().execute(clearScroll);
+                    if (!clearResult.isSucceeded()) {
+                        LOG.info("Failed to clear one or more scrolls: {}", clearResult.getErrorMessage());
+                    }
+                } catch (IOException e) {
+                    LOG.warn("Error while clearing scrolls ids: {}", scrollIds, e);
+                }
             }
         }
+
     }
 
     public ESClient getEsClient() {
