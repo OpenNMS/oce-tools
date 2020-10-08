@@ -3,7 +3,7 @@ version: 2
 jobs:
   build:
     docker:
-      image: circleci/openjdk:8-buster
+      image: circleci/openjdk:8-jdk
 
     environment:
       MAVEN_OPTS: -Xmx1024m
