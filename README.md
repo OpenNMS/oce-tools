@@ -1,4 +1,4 @@
-# OpenNMS Correlation Engine (OCE) Tools
+# OpenNMS Correlation Engine (OCE) Tools [![CircleCI](https://circleci.com/gh/OpenNMS/oce-tools.svg?style=svg)](https://circleci.com/gh/OpenNMS/oce-tools)
 
 This repository contains a collection of tools and utilities to help develop, test, and validate the functionality of the OCE.
 
